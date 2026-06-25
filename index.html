@@ -63,6 +63,17 @@
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%2383838d' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
     background-repeat:no-repeat;background-position:right 12px center}
   select.origin:focus{outline:none;border-color:var(--orange)}
+  select.origin:disabled{opacity:.5;cursor:not-allowed}
+  .whinfo{display:none;margin-top:11px;padding:11px 13px;border:1px solid var(--line-soft);border-radius:9px;
+    background:var(--raised);align-items:center;gap:12px;justify-content:space-between}
+  .whinfo.show{display:flex}
+  .whinfo .lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .whinfo .qty{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--green);line-height:1}
+  .whinfo .qty small{font-size:11px;color:var(--faint);font-weight:400;margin-left:5px}
+  .jumpbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--raised);
+    color:var(--ink);padding:9px 14px;border-radius:9px;font-size:12.5px;font-weight:600;text-decoration:none;transition:.14s}
+  .jumpbtn:hover{border-color:var(--orange);color:var(--orange)}
+  .jumpbtn .arw{color:var(--orange)}
 
   .search{width:100%;margin-top:14px;background:var(--raised);border:1px solid var(--line);
     color:var(--ink);font-size:13px;padding:10px 12px;border-radius:9px}
@@ -168,7 +179,10 @@
       <h1>今日路线计划</h1>
       <div class="sub">选起点 → 挑路线 → 填车数与每车 pallet、重量 → 导出 PLAN</div>
     </div>
-    <div class="date">今天<br><b id="today">—</b></div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <a class="jumpbtn" href="warehouse-routes.html">仓库路线分配 <span class="arw">→</span></a>
+      <div class="date">今天<br><b id="today">—</b></div>
+    </div>
   </header>
 
   <div class="grid">
@@ -180,7 +194,15 @@
         <div class="selrow">
           <select class="origin" id="origin"><option value="">— 选择起点 —</option></select>
         </div>
-        <input class="search" id="search" placeholder="在该起点下搜索路线…（如 JFK、MIA）" autocomplete="off">
+        <label class="fld" for="warehouse" style="margin-top:14px">仓库 WAREHOUSE（可留空 = 全部）</label>
+        <div class="selrow">
+          <select class="origin" id="warehouse" disabled><option value="">— 全部（不限仓库）—</option></select>
+        </div>
+        <div class="whinfo" id="whInfo">
+          <span class="lbl">该仓库今日货量</span>
+          <span class="qty" id="whQty">—</span>
+        </div>
+        <input class="search" id="search" placeholder="搜索路线…（如 JFK、MIA）" autocomplete="off">
         <div class="rlist" id="rlist"></div>
       </div>
     </section>
@@ -270,11 +292,74 @@ const rlist = document.getElementById("rlist");
 const search = document.getElementById("search");
 let curOrigin = "";
 
+// ===== 仓库 / 对应关系 状态 =====
+const whSel = document.getElementById("warehouse");
+let WAREHOUSES = new Map();   // id -> {name, qty}
+let whRoutes = new Map();     // 仓库id -> Set(路线)
+let mappedWh = [];            // [{id, name}] 有分配的仓库（按对应关系顺序）
+let curWh = "";              // 当前选中仓库id（"" = 全部）
+
+// 仓库数据就绪：解析 warehouses.json（兼容 {data:[...]} 或数组）
+function initWarehouses(raw){
+  const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : null);
+  if(!arr) throw new Error("warehouses.json 结构不对（需数组或 {data:[...]}）");
+  WAREHOUSES = new Map();
+  arr.forEach(w=> WAREHOUSES.set(w.id, {name:w.name, qty:w.qty}));
+  refreshWarehouseUI();
+}
+// 对应关系就绪：warehouse-routes.json（[{warehouse, warehouse_id, routes}]）
+function initMapping(arr){
+  if(!Array.isArray(arr)) throw new Error("warehouse-routes.json 应为数组");
+  whRoutes = new Map();
+  mappedWh = [];
+  arr.forEach(o=>{
+    const id = o.warehouse_id;
+    const routes = Array.isArray(o.routes) ? o.routes : [];
+    if(id==null) return;
+    whRoutes.set(id, new Set(routes));
+    mappedWh.push({ id, name: o.warehouse });
+  });
+  refreshWarehouseUI();
+}
+// 填充仓库下拉（需要对应关系；货量取自 warehouses.json）
+function refreshWarehouseUI(){
+  if(!mappedWh.length){ whSel.disabled = true; return; }
+  whSel.disabled = false;
+  whSel.length = 1; // 保留"全部"
+  mappedWh.forEach(w=>{
+    const info = WAREHOUSES.get(w.id);
+    const qty = info ? `  ·  ${info.qty}` : "";
+    const name = (info && info.name) || w.name || ("#"+w.id);
+    const opt = document.createElement("option");
+    opt.value = String(w.id);
+    opt.textContent = `${name}${qty}`;
+    whSel.appendChild(opt);
+  });
+}
+function updateWhInfo(){
+  const box = document.getElementById("whInfo");
+  if(curWh===""){ box.classList.remove("show"); return; }
+  const info = WAREHOUSES.get(Number(curWh));
+  document.getElementById("whQty").innerHTML = info
+    ? `${info.qty}<small>${info.name}</small>`
+    : `—<small>warehouses.json 无此仓库</small>`;
+  box.classList.add("show");
+}
+
 function renderRoutes(){
   rlist.innerHTML = "";
-  if(!curOrigin) return;
-  const q = search.value.trim().toUpperCase();
+  if(!curOrigin){ rlist.innerHTML = '<div class="nomatch">先选一个起点</div>'; return; }
   let list = byOrigin[curOrigin].slice().sort((a,b)=>b.count-a.count);
+  // 选了仓库：只保留该仓库对应关系里的路线
+  if(curWh!==""){
+    const set = whRoutes.get(Number(curWh));
+    if(!set || set.size===0){
+      rlist.innerHTML = '<div class="nomatch">该仓库今天没有分配路线</div>'; return;
+    }
+    list = list.filter(r=>set.has(r.route));
+    if(!list.length){ rlist.innerHTML = '<div class="nomatch">该仓库在当前起点下没有路线</div>'; return; }
+  }
+  const q = search.value.trim().toUpperCase();
   if(q) list = list.filter(r=>r.route.toUpperCase().includes(q));
   if(!list.length){ rlist.innerHTML = '<div class="nomatch">没有匹配的路线</div>'; return; }
   list.forEach(r=>{
@@ -291,6 +376,7 @@ function renderRoutes(){
 }
 
 originSel.onchange = ()=>{ curOrigin = originSel.value; search.value=""; renderRoutes(); };
+whSel.onchange = ()=>{ curWh = whSel.value; updateWhInfo(); renderRoutes(); };
 search.oninput = renderRoutes;
 
 // ---- 计划操作 ----
@@ -433,55 +519,62 @@ function toast(t){
 
 renderPlan();
 
-// ---- 加载 routes.json（兼容 http 服务器 / 本地双击两种打开方式）----
-function showFallbackPicker(msg){
-  const body = document.querySelector(".panel .pbody"); // 左侧面板 body
-  if(document.getElementById("routeLoader")) return; // 避免重复
+// ---- 加载三个 json（兼容 http 服务器 / 本地双击）----
+// routes.json（必需）, warehouses.json（仓库+货量）, warehouse-routes.json（对应关系）
+const FILES = [
+  { name:"routes.json",          required:true,  ingest: data => { if(!Array.isArray(data)) throw new Error("不是数组"); initRoutes(data); } },
+  { name:"warehouses.json",      required:false, ingest: data => initWarehouses(data) },
+  { name:"warehouse-routes.json",required:false, ingest: data => initMapping(data) },
+];
+
+function showFallback(missing){
+  const body = document.querySelector(".panel .pbody");
+  if(document.getElementById("routeLoader")) return;
   const box = document.createElement("div");
   box.id = "routeLoader";
   box.style.cssText = "margin-bottom:14px;padding:13px;border:1px solid var(--orange-dim);"
     + "border-radius:9px;background:rgba(236,139,60,.07)";
-  box.innerHTML = '<div style="font-size:12.5px;color:var(--ink);margin-bottom:9px;line-height:1.5">'
-    + (msg||"无法自动读取 routes.json") + '</div>'
-    + '<label class="btn" style="display:inline-block;cursor:pointer;font-size:12px;padding:8px 13px">'
-    + '选择 routes.json<input id="routeFile" type="file" accept=".json,application/json" style="display:none"></label>'
-    + '<span id="routeFileMsg" style="margin-left:10px;font-size:12px;color:var(--muted)"></span>';
+  let html = '<div style="font-size:12.5px;color:var(--ink);margin-bottom:10px;line-height:1.55">'
+    + '无法自动读取以下文件（多为双击 file:// 打开所致）。请手动选择，<b>或</b>用本地服务器打开本页即可自动读取。</div>'
+    + '<div style="display:flex;gap:9px;flex-wrap:wrap">';
+  missing.forEach((f,i)=>{
+    html += '<label class="btn" style="cursor:pointer;font-size:12px;padding:8px 13px" id="pk'+i+'">'
+      + '选择 '+f.name+'<input type="file" accept=".json,application/json" style="display:none"></label>';
+  });
+  html += '</div><div id="pkMsg" style="margin-top:9px;font-size:12px;color:var(--muted)"></div>';
+  box.innerHTML = html;
   body.insertBefore(box, body.firstChild);
-  document.getElementById("routeFile").addEventListener("change", e=>{
-    const f = e.target.files[0]; if(!f) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      try{
-        const data = JSON.parse(reader.result);
-        if(!Array.isArray(data)) throw new Error("不是数组");
-        initRoutes(data);
-        document.getElementById("routeFileMsg").textContent = `已加载 ${data.length} 条`;
-        document.getElementById("routeFileMsg").style.color = "var(--green)";
-      }catch(err){
-        document.getElementById("routeFileMsg").textContent = "解析失败：" + err.message;
-        document.getElementById("routeFileMsg").style.color = "var(--red)";
-      }
-    };
-    reader.readAsText(f);
+  missing.forEach((f,i)=>{
+    document.querySelector("#pk"+i+" input").addEventListener("change", e=>{
+      const file=e.target.files[0]; if(!file) return;
+      const rd=new FileReader();
+      rd.onload=()=>{
+        try{ f.ingest(JSON.parse(rd.result));
+          document.getElementById("pk"+i).style.borderColor="var(--green)";
+          document.getElementById("pk"+i).style.color="var(--green)";
+          document.getElementById("pkMsg").textContent = f.name+" 已加载";
+          document.getElementById("pkMsg").style.color="var(--green)";
+        }catch(err){
+          document.getElementById("pkMsg").textContent = f.name+" 解析失败："+err.message;
+          document.getElementById("pkMsg").style.color="var(--red)";
+        }
+      };
+      rd.readAsText(file);
+    });
   });
 }
 
-function loadRoutes(){
-  fetch("routes.json")
-    .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
-    .then(data => {
-      if(!Array.isArray(data)) throw new Error("routes.json 不是数组");
-      initRoutes(data);
-    })
-    .catch(err => {
-      // 双击 file:// 打开时 fetch 会被浏览器拦截，走手动选择回退
-      showFallbackPicker(
-        "无法自动读取同目录的 routes.json（多为双击打开所致）。<br>"
-        + "请点下方按钮手动选择 routes.json；<b>或</b>用本地服务器打开本页即可自动读取。"
-      );
-    });
+function loadAll(){
+  Promise.allSettled(FILES.map(f =>
+    fetch(f.name).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(data=>{ f.ingest(data); return true; })
+  )).then(res=>{
+    const missing = [];
+    res.forEach((r,i)=>{ if(r.status==="rejected") missing.push(FILES[i]); });
+    if(missing.length) showFallback(missing);
+  });
 }
-loadRoutes();
+loadAll();
 </script>
 </body>
 </html>
