@@ -1,0 +1,141 @@
+[
+  {
+    "warehouse": "ALB Warehouse",
+    "warehouse_id": 57,
+    "routes": [
+      "EWR600 > ALB025",
+      "EWR600 > SWF001 > ALB025",
+      "EWR600 > ALB025 > SYR235",
+      "EWR600 > SWF392 > ALB025"
+    ]
+  },
+  {
+    "warehouse": "AVP Warehouse",
+    "warehouse_id": 70,
+    "routes": [
+      "EWR600 > AVP226",
+      "EWR600 > ABE113 > AVP226"
+    ]
+  },
+  {
+    "warehouse": "BOS Warehouse",
+    "warehouse_id": 39,
+    "routes": [
+      "EWR600 > BOS001"
+    ]
+  },
+  {
+    "warehouse": "BTV Warehouse",
+    "warehouse_id": 82,
+    "routes": [
+      "EWR600 > BTV485"
+    ]
+  },
+  {
+    "warehouse": "BUF Warehouse",
+    "warehouse_id": 45,
+    "routes": [
+      "EWR600 > BUF433",
+      "EWR600 > ROC075 > BUF433"
+    ]
+  },
+  {
+    "warehouse": "CLT Warehouse",
+    "warehouse_id": 34,
+    "routes": [
+      "EWR600 > CLT133"
+    ]
+  },
+  {
+    "warehouse": "DCA Warehouse",
+    "warehouse_id": 26,
+    "routes": [
+      "EWR600 > DCA522",
+      "EWR600 > DCA521 > DCA522",
+      "EWR600 > DCA521"
+    ]
+  },
+  {
+    "warehouse": "ERI Warehouse",
+    "warehouse_id": 83,
+    "routes": [
+      "EWR600 > ERI345"
+    ]
+  },
+  {
+    "warehouse": "JFK Warehouse",
+    "warehouse_id": 17,
+    "routes": [
+      "EWR600 > JFK175",
+      "EWR600 > JFK113",
+      "EWR600 > JFK290"
+    ]
+  },
+  {
+    "warehouse": "MDT Warehouse",
+    "warehouse_id": 58,
+    "routes": [
+      "EWR600 > MDT185"
+    ]
+  },
+  {
+    "warehouse": "PHL Warehouse",
+    "warehouse_id": 25,
+    "routes": [
+      "EWR600 > PHL160"
+    ]
+  },
+  {
+    "warehouse": "PIT Warehouse",
+    "warehouse_id": 59,
+    "routes": [
+      "EWR600 > PIT017"
+    ]
+  },
+  {
+    "warehouse": "PWM Warehouse",
+    "warehouse_id": 74,
+    "routes": [
+      "EWR600 > PWM417",
+      "EWR600 > MHT157 > PWM417"
+    ]
+  },
+  {
+    "warehouse": "RDU Warehouse",
+    "warehouse_id": 35,
+    "routes": [
+      "EWR600 > RDU550",
+      "EWR600 > RDU550 > GSO215"
+    ]
+  },
+  {
+    "warehouse": "RIC Warehouse",
+    "warehouse_id": 52,
+    "routes": [
+      "EWR600 > RIC843"
+    ]
+  },
+  {
+    "warehouse": "ROA Warehouse",
+    "warehouse_id": 80,
+    "routes": [
+      "EWR600 > ROA173"
+    ]
+  },
+  {
+    "warehouse": "SHD Warehouse",
+    "warehouse_id": 84,
+    "routes": [
+      "EWR600 > SHD260 > ROA173"
+    ]
+  },
+  {
+    "warehouse": "SYR Warehouse",
+    "warehouse_id": 71,
+    "routes": [
+      "EWR600 > SYR235",
+      "EWR600 > ALB025 > SYR235",
+      "EWR600 > SWF001 > SYR235"
+    ]
+  }
+]

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warehouse Routing · 仓库路线分配</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0c0e; --panel:#141419; --raised:#1b1b22;
+    --line:#2a2a32; --line-soft:#202027;
+    --ink:#ece9e3; --muted:#83838d; --faint:#5b5b64;
+    --orange:#ec8b3c; --orange-dim:#7a4d24;
+    --green:#5bb98c; --green-dim:#2f5e48;
+    --blue:#6f9fd8; --red:#c96a5e;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Space Grotesk",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  input{font-family:var(--mono)}
+  ::selection{background:var(--orange);color:#1a1205}
+
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 22px 64px}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:20px;flex-wrap:wrap}
+  .brand{display:flex;flex-direction:column;gap:3px}
+  .brand .kick{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--orange);font-weight:600}
+  .brand h1{margin:0;font-size:25px;font-weight:700;letter-spacing:-.01em}
+  .brand .sub{color:var(--muted);font-size:13px}
+  .filestat{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;line-height:1.7}
+  .filestat .ok{color:var(--green)} .filestat .bad{color:var(--orange)}
+
+  /* loader fallback */
+  .loader{display:none;margin-bottom:18px;padding:14px 16px;border:1px solid var(--orange-dim);
+    border-radius:10px;background:rgba(236,139,60,.07)}
+  .loader.show{display:block}
+  .loader p{margin:0 0 11px;font-size:13px;line-height:1.55;color:var(--ink)}
+  .loader .picks{display:flex;gap:10px;flex-wrap:wrap}
+  .pickbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--raised);
+    color:var(--ink);padding:9px 14px;border-radius:8px;font-size:12.5px;font-weight:600}
+  .pickbtn:hover{border-color:var(--orange)} .pickbtn.done{border-color:var(--green);color:var(--green)}
+  .pickbtn input{display:none}
+
+  /* board */
+  .board{display:grid;grid-template-columns:1.05fr 1.15fr 1fr;gap:18px;align-items:start}
+  @media(max-width:920px){.board{grid-template-columns:1fr}}
+  .col{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;
+    display:flex;flex-direction:column;min-height:120px}
+  .chead{display:flex;align-items:center;gap:9px;padding:13px 15px;border-bottom:1px solid var(--line-soft)}
+  .chead .ico{width:8px;height:8px;border-radius:2px;flex:none}
+  .chead h2{margin:0;font-size:13.5px;font-weight:600}
+  .chead .meta{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .cbody{padding:13px}
+
+  .search{width:100%;background:var(--raised);border:1px solid var(--line);color:var(--ink);
+    font-size:13px;padding:9px 11px;border-radius:8px;margin-bottom:11px}
+  .search:focus{outline:none;border-color:var(--orange)}
+  .search::placeholder{color:var(--faint)}
+
+  .scroll{max-height:460px;overflow-y:auto;border:1px solid var(--line-soft);border-radius:8px}
+  .scroll:empty::after,.emptynote{content:"";display:block;padding:30px 14px;text-align:center;color:var(--faint);font-size:12.5px}
+
+  /* warehouse rows */
+  .whrow{display:flex;align-items:center;gap:11px;padding:10px 12px;border-bottom:1px solid var(--line-soft);
+    cursor:pointer;transition:background .12s}
+  .whrow:last-child{border-bottom:none}
+  .whrow:hover{background:var(--raised)}
+  .whrow.sel{background:rgba(236,139,60,.10);box-shadow:inset 2px 0 0 var(--orange)}
+  .whrow .wmain{flex:1;min-width:0}
+  .whrow .wname{font-size:13px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .whrow .wmeta{font-family:var(--mono);font-size:11px;color:var(--blue);margin-top:2px}
+  .whrow .wmeta .q{color:var(--faint)}
+  .badge{font-family:var(--mono);font-size:11px;min-width:22px;height:22px;padding:0 6px;border-radius:6px;
+    display:grid;place-items:center;background:var(--raised);color:var(--faint);border:1px solid var(--line-soft);flex:none}
+  .badge.has{background:var(--green-dim);color:#cdeede;border-color:transparent}
+
+  /* available route rows */
+  .rrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line-soft)}
+  .rrow:last-child{border-bottom:none}
+  .rrow:hover{background:var(--raised)}
+  .rrow .code{font-family:var(--mono);font-size:13px;color:var(--ink);flex:1;letter-spacing:-.01em}
+  .rrow .cnt{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .rrow .elsew{font-size:10.5px;color:var(--blue);background:rgba(111,159,216,.1);padding:2px 6px;border-radius:5px;white-space:nowrap}
+  .rrow .add{background:transparent;border:1px solid var(--line);color:var(--muted);width:26px;height:26px;
+    border-radius:7px;font-size:17px;line-height:1;display:grid;place-items:center;flex:none;transition:.12s}
+  .rrow .add:hover{border-color:var(--orange);color:var(--orange)}
+  .rrow.added{opacity:.45}
+  .rrow.added .code{color:var(--green)}
+  .rrow.added .add{border-color:var(--green-dim);color:var(--green);pointer-events:none}
+
+  /* assigned rows */
+  .arow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line-soft);background:var(--raised)}
+  .arow:last-child{border-bottom:none}
+  .arow .code{font-family:var(--mono);font-size:13px;color:var(--ink);flex:1}
+  .arow .del{background:transparent;border:none;color:var(--faint);font-size:15px;padding:3px 6px;border-radius:6px;line-height:1}
+  .arow .del:hover{color:var(--red);background:rgba(201,106,94,.1)}
+
+  .placeholder{padding:40px 16px;text-align:center;color:var(--faint);font-size:13px;line-height:1.6}
+  .placeholder .big{font-family:var(--mono);color:var(--muted);margin-bottom:6px}
+
+  /* footer / export */
+  .footer{margin-top:20px;background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden}
+  .stats{display:flex;gap:22px;padding:15px 18px;flex-wrap:wrap;align-items:center}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat .n{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+  .stat .l{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stat.o .n{color:var(--orange)} .stat.g .n{color:var(--green)}
+  .opts{margin-left:auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
+  .chk input{accent-color:var(--orange);width:15px;height:15px}
+  .actions{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:var(--raised);color:var(--ink);padding:11px 16px;border-radius:9px;
+    font-size:13px;font-weight:600;transition:.14s}
+  .btn:hover{border-color:var(--muted)}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a1205}
+  .btn.primary:hover{background:#f59a4d}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{color:var(--muted)}
+
+  .sheet{margin-top:18px;border:1px solid var(--line-soft);border-radius:12px;background:var(--panel);overflow:hidden;display:none}
+  .sheet.show{display:block}
+  .shead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+  .shead h3{margin:0;font-size:13px;font-weight:600;font-family:var(--mono);color:var(--muted)}
+  .shead .copy{margin-left:auto;border:1px solid var(--line);background:var(--raised);color:var(--ink);
+    padding:7px 13px;border-radius:7px;font-size:12px;font-weight:600}
+  .shead .copy:hover{border-color:var(--orange);color:var(--orange)}
+  .shead .copy.done{border-color:var(--green);color:var(--green)}
+  pre{margin:0;padding:16px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:#d6d3cc;max-height:380px}
+  pre .k{color:var(--blue)} pre .s{color:var(--green)} pre .n{color:var(--orange)}
+
+  .importbar{margin-top:14px}
+  .importbar summary{cursor:pointer;color:var(--muted);font-size:12.5px;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .importbar summary::-webkit-details-marker{display:none}
+  .importbar summary:hover{color:var(--ink)}
+  .importbar textarea{width:100%;margin-top:10px;background:var(--raised);border:1px solid var(--line);color:var(--ink);
+    font-family:var(--mono);font-size:12px;padding:11px;border-radius:9px;min-height:90px;resize:vertical}
+  .importbar textarea:focus{outline:none;border-color:var(--orange)}
+  .importbar .irow{display:flex;gap:9px;margin-top:9px;align-items:center}
+  .importbar .msg{font-size:12px;color:var(--muted)} .importbar .msg.err{color:var(--red)} .importbar .msg.ok{color:var(--green)}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--raised);
+    border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:10px;font-size:13px;opacity:0;
+    pointer-events:none;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .scroll::-webkit-scrollbar,pre::-webkit-scrollbar{height:8px;width:8px}
+  .scroll::-webkit-scrollbar-thumb,pre::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="kick">Warehouse Routing</div>
+      <h1>仓库路线分配</h1>
+      <div class="sub">选仓库 → 分配它负责的路线 → 导出对应关系</div>
+    </div>
+    <div class="filestat" id="filestat">routes.json <span id="rStat" class="bad">…</span><br>warehouses.json <span id="wStat" class="bad">…</span></div>
+  </header>
+
+  <div class="loader" id="loader">
+    <p id="loaderMsg"></p>
+    <div class="picks">
+      <label class="pickbtn" id="pickRoutesBtn">选择 routes.json<input type="file" id="pickRoutes" accept=".json,application/json"></label>
+      <label class="pickbtn" id="pickWhBtn">选择 warehouses.json<input type="file" id="pickWh" accept=".json,application/json"></label>
+    </div>
+  </div>
+
+  <div class="board">
+    <!-- col 1: warehouses -->
+    <section class="col">
+      <div class="chead"><span class="ico" style="background:var(--blue)"></span><h2>仓库</h2><span class="meta" id="whMeta"></span></div>
+      <div class="cbody">
+        <input class="search" id="whSearch" placeholder="搜索仓库名…" autocomplete="off">
+        <div class="scroll" id="whList"></div>
+      </div>
+    </section>
+
+    <!-- col 2: available routes -->
+    <section class="col">
+      <div class="chead"><span class="ico" style="background:var(--orange)"></span><h2>可选路线</h2><span class="meta" id="rMeta"></span></div>
+      <div class="cbody" id="rBody">
+        <div class="placeholder"><div class="big">未选择仓库</div>先在左边选一个仓库，<br>再从这里把路线分配给它</div>
+      </div>
+    </section>
+
+    <!-- col 3: assigned -->
+    <section class="col">
+      <div class="chead"><span class="ico" style="background:var(--green)"></span><h2 id="aTitle">已分配</h2><span class="meta" id="aMeta"></span></div>
+      <div class="cbody" id="aBody">
+        <div class="placeholder"><div class="big">—</div>该仓库分配的路线<br>会显示在这里</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <div class="stats">
+      <div class="stat"><span class="n" id="sWh">0</span><span class="l">仓库总数</span></div>
+      <div class="stat g"><span class="n" id="sMapped">0</span><span class="l">已分配仓库</span></div>
+      <div class="stat o"><span class="n" id="sLinks">0</span><span class="l">分配总数</span></div>
+      <div class="opts">
+        <label class="chk"><input type="checkbox" id="inclEmpty">导出含无路线的仓库</label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="exportBtn" disabled>导出对应关系</button>
+      <button class="btn ghost" id="clearBtn" disabled>清空全部</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheet">
+    <div class="shead"><h3 id="sheetName">warehouse_routes.json</h3><button class="copy" id="copyBtn">复制</button></div>
+    <pre id="code"></pre>
+  </div>
+
+  <details class="importbar">
+    <summary>▸ 导入已有对应关系继续编辑</summary>
+    <textarea id="importText" placeholder='粘贴之前导出的 JSON（数组格式）'></textarea>
+    <div class="irow"><button class="btn" id="importBtn">导入</button><span class="msg" id="importMsg"></span></div>
+  </details>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 状态 =====
+let ROUTES = [];           // [{route,count}]
+let WAREHOUSES = [];       // [{name,id,qty}]
+const assign = new Map();  // warehouseId -> [route, ...]
+let selWh = null;          // 当前选中仓库 id
+let loaded = { routes:false, wh:false };
+
+// ===== 工具 =====
+const $ = id => document.getElementById(id);
+function toast(t){ const e=$("toast"); e.textContent=t; e.classList.add("show"); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove("show"),2000); }
+function whName(id){ const w=WAREHOUSES.find(w=>w.id===id); return w?w.name:String(id); }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// route -> 已分配到哪些仓库id（用于"已分配N仓"提示）
+function routeAssignedTo(route){
+  const out=[]; for(const [wid,list] of assign){ if(list.includes(route)) out.push(wid); } return out;
+}
+
+// ===== 渲染：仓库列 =====
+function renderWarehouses(){
+  const q = $("whSearch").value.trim().toUpperCase();
+  let list = WAREHOUSES.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if(q) list = list.filter(w=>w.name.toUpperCase().includes(q));
+  const box = $("whList"); box.innerHTML="";
+  if(!list.length){ box.innerHTML='<div class="emptynote">没有匹配的仓库</div>'; return; }
+  list.forEach(w=>{
+    const n = (assign.get(w.id)||[]).length;
+    const row = document.createElement("div");
+    row.className = "whrow" + (w.id===selWh?" sel":"");
+    row.innerHTML = `<div class="wmain">
+        <div class="wname">${esc(w.name)}</div>
+        <div class="wmeta">#${w.id} <span class="q">· qty ${w.qty}</span></div>
+      </div>
+      <span class="badge ${n>0?"has":""}">${n}</span>`;
+    row.onclick = ()=>{ selWh = w.id; renderWarehouses(); renderAvailable(); renderAssigned(); };
+    box.appendChild(row);
+  });
+  $("whMeta").textContent = `${WAREHOUSES.length} 个`;
+}
+
+// ===== 渲染：可选路线列 =====
+function renderAvailable(){
+  const body = $("rBody");
+  if(selWh===null){ body.innerHTML='<div class="placeholder"><div class="big">未选择仓库</div>先在左边选一个仓库，<br>再从这里把路线分配给它</div>'; $("rMeta").textContent=""; return; }
+  body.innerHTML = '<input class="search" id="rSearch" placeholder="搜索路线…（如 JFK、EWR600）" autocomplete="off"><div class="scroll" id="rList"></div>';
+  const cur = assign.get(selWh) || [];
+  const draw = ()=>{
+    const q = $("rSearch").value.trim().toUpperCase();
+    let list = ROUTES.slice().sort((a,b)=>b.count-a.count);
+    if(q) list = list.filter(r=>r.route.toUpperCase().includes(q));
+    const box = $("rList"); box.innerHTML="";
+    if(!list.length){ box.innerHTML='<div class="emptynote">没有匹配的路线</div>'; return; }
+    list.forEach(r=>{
+      const inCur = cur.includes(r.route);
+      const others = routeAssignedTo(r.route).filter(id=>id!==selWh);
+      const row = document.createElement("div");
+      row.className = "rrow"+(inCur?" added":"");
+      let elsew = others.length ? `<span class="elsew" title="${others.map(whName).map(esc).join(', ')}">已分配 ${others.length} 仓</span>` : "";
+      row.innerHTML = `<span class="code">${esc(r.route)}</span>${elsew}<span class="cnt">${r.count}</span>
+        <button class="add">${inCur?"✓":"+"}</button>`;
+      const addFn = ()=>{ if(!inCur){ assignRoute(selWh, r.route); } };
+      row.querySelector(".add").onclick = addFn;
+      if(!inCur) row.querySelector(".code").onclick = addFn;
+      box.appendChild(row);
+    });
+  };
+  $("rSearch").oninput = draw; draw();
+  $("rMeta").textContent = `${ROUTES.length} 条`;
+}
+
+// ===== 渲染：已分配列 =====
+function renderAssigned(){
+  const body = $("aBody");
+  if(selWh===null){ body.innerHTML='<div class="placeholder"><div class="big">—</div>该仓库分配的路线<br>会显示在这里</div>'; $("aTitle").textContent="已分配"; $("aMeta").textContent=""; return; }
+  const cur = assign.get(selWh) || [];
+  $("aTitle").textContent = `已分配给 ${whName(selWh)}`;
+  $("aMeta").textContent = `${cur.length} 条`;
+  if(!cur.length){ body.innerHTML='<div class="placeholder"><div class="big">还没分配</div>从中间那列点 + 添加路线</div>'; return; }
+  body.innerHTML = '<div class="scroll" id="aList"></div>';
+  const box = $("aList");
+  cur.forEach(route=>{
+    const row = document.createElement("div");
+    row.className="arow";
+    row.innerHTML = `<span class="code">${esc(route)}</span><button class="del" title="移除">✕</button>`;
+    row.querySelector(".del").onclick = ()=>unassignRoute(selWh, route);
+    box.appendChild(row);
+  });
+}
+
+// ===== 分配操作 =====
+function assignRoute(wid, route){
+  const list = assign.get(wid) || [];
+  if(!list.includes(route)){ list.push(route); assign.set(wid, list); }
+  renderWarehouses(); renderAvailable(); renderAssigned(); updStats();
+}
+function unassignRoute(wid, route){
+  const list = assign.get(wid) || [];
+  const i = list.indexOf(route);
+  if(i>=0){ list.splice(i,1); if(list.length===0) assign.delete(wid); else assign.set(wid,list); }
+  renderWarehouses(); renderAvailable(); renderAssigned(); updStats();
+}
+
+// ===== 统计 =====
+function updStats(){
+  let links=0; for(const l of assign.values()) links+=l.length;
+  $("sWh").textContent = WAREHOUSES.length;
+  $("sMapped").textContent = [...assign.values()].filter(l=>l.length>0).length;
+  $("sLinks").textContent = links;
+  const has = links>0;
+  $("exportBtn").disabled = !has; $("clearBtn").disabled = !has;
+  if(!has) $("sheet").classList.remove("show");
+}
+
+// ===== 导出 =====
+function buildMapping(){
+  const inclEmpty = $("inclEmpty").checked;
+  const out = [];
+  WAREHOUSES.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(w=>{
+    const routes = assign.get(w.id) || [];
+    if(routes.length>0 || inclEmpty){
+      out.push({ warehouse: w.name, warehouse_id: w.id, routes: routes.slice() });
+    }
+  });
+  return out;
+}
+function highlight(json){
+  return esc(json)
+    .replace(/("warehouse"|"warehouse_id"|"routes")/g,'<span class="k">$1</span>')
+    .replace(/: (\d+)/g,': <span class="n">$1</span>')
+    .replace(/("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g,'<span class="s">$1</span>');
+}
+$("exportBtn").onclick = ()=>{
+  const json = JSON.stringify(buildMapping(), null, 2);
+  $("code").innerHTML = highlight(json);
+  $("sheet").classList.add("show");
+  $("sheet").scrollIntoView({behavior:"smooth",block:"nearest"});
+  $("copyBtn").textContent="复制"; $("copyBtn").classList.remove("done");
+};
+$("copyBtn").onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(JSON.stringify(buildMapping(), null, 2));
+    const b=$("copyBtn"); b.textContent="已复制 ✓"; b.classList.add("done"); toast("已复制到剪贴板");
+  }catch(e){ toast("复制失败，请手动选中"); }
+};
+$("inclEmpty").onchange = ()=>{ if($("sheet").classList.contains("show")) $("exportBtn").click(); };
+$("clearBtn").onclick = ()=>{ if(assign.size && confirm("清空所有分配？")){ assign.clear(); renderWarehouses(); renderAvailable(); renderAssigned(); updStats(); $("sheet").classList.remove("show"); } };
+
+// ===== 导入 =====
+$("importBtn").onclick = ()=>{
+  const txt = $("importText").value.trim(); const msg=$("importMsg");
+  if(!txt){ msg.className="msg err"; msg.textContent="请先粘贴内容"; return; }
+  try{
+    const arr = JSON.parse(txt);
+    if(!Array.isArray(arr)) throw new Error("应为数组");
+    assign.clear();
+    arr.forEach(o=>{
+      let wid = o.warehouse_id;
+      if(wid==null && o.warehouse){ const w=WAREHOUSES.find(w=>w.name===o.warehouse); wid=w&&w.id; }
+      if(wid!=null && Array.isArray(o.routes) && o.routes.length) assign.set(wid, o.routes.slice());
+    });
+    renderWarehouses(); renderAvailable(); renderAssigned(); updStats();
+    msg.className="msg ok"; msg.textContent=`已导入 ${assign.size} 个仓库的分配`;
+  }catch(e){ msg.className="msg err"; msg.textContent="解析失败："+e.message; }
+};
+
+$("whSearch").oninput = renderWarehouses;
+
+// ===== 数据加载（兼容 http 服务器 / 双击 file://）=====
+function afterLoad(){
+  if(loaded.routes && loaded.wh){
+    renderWarehouses(); renderAvailable(); renderAssigned(); updStats();
+  }
+}
+function setStat(which, ok, n){
+  const el = $(which==="routes"?"rStat":"wStat");
+  el.className = ok?"ok":"bad"; el.textContent = ok?`✓ ${n}`:"未加载";
+}
+function ingestRoutes(data){
+  ROUTES = data.map(r=>Array.isArray(r)?{route:r[0],count:r[1]}:{route:r.route,count:r.count});
+  loaded.routes=true; setStat("routes",true,ROUTES.length+" 条"); afterLoad();
+}
+function ingestWarehouses(raw){
+  const data = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : null);
+  if(!data) throw new Error("warehouses.json 结构不对（需要数组或 {data:[...]}）");
+  WAREHOUSES = data.map(w=>({name:w.name, id:w.id, qty:w.qty}));
+  loaded.wh=true; setStat("wh",true,WAREHOUSES.length+" 个"); afterLoad();
+}
+
+function tryFetch(file, onok){
+  return fetch(file).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }).then(onok);
+}
+function showLoader(msg){ $("loaderMsg").innerHTML = msg; $("loader").classList.add("show"); }
+
+// 文件选择回退
+function wirerPicker(inputId, btnId, ingest, label){
+  $(inputId).addEventListener("change", e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{ try{ ingest(JSON.parse(rd.result)); $(btnId).classList.add("done"); $(btnId).childNodes[0].textContent=label+" ✓ "; }
+      catch(err){ toast(label+" 解析失败："+err.message); } };
+    rd.readAsText(f);
+  });
+}
+wirerPicker("pickRoutes","pickRoutesBtn",ingestRoutes,"routes.json");
+wirerPicker("pickWh","pickWhBtn",ingestWarehouses,"warehouses.json");
+
+// 启动：先尝试自动读取
+Promise.allSettled([
+  tryFetch("routes.json", ingestRoutes),
+  tryFetch("warehouses.json", ingestWarehouses)
+]).then(res=>{
+  const failed = res.some(r=>r.status==="rejected");
+  if(failed){
+    showLoader("无法自动读取同目录的 json 文件（多为双击打开所致）。<br>"
+      + "请用下方按钮手动选择缺失的文件；<b>或</b>改用本地服务器打开本页即可自动读取。<br>"
+      + "需要两个文件：<b>routes.json</b>（路线）和 <b>warehouses.json</b>（仓库，即你那份带 data 的 json）。");
+  }
+});
+</script>
+</body>
+</html>
