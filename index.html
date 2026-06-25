@@ -307,9 +307,9 @@ function initWarehouses(raw){
   arr.forEach(w=> WAREHOUSES.set(w.id, {name:w.name, qty:w.qty}));
   refreshWarehouseUI();
 }
-// 对应关系就绪：warehouse-routes.json（[{warehouse, warehouse_id, routes}]）
+// 对应关系就绪：warehouse_routes.json（[{warehouse, warehouse_id, routes}]）
 function initMapping(arr){
-  if(!Array.isArray(arr)) throw new Error("warehouse-routes.json 应为数组");
+  if(!Array.isArray(arr)) throw new Error("warehouse_routes.json 应为数组");
   whRoutes = new Map();
   mappedWh = [];
   arr.forEach(o=>{
@@ -520,11 +520,11 @@ function toast(t){
 renderPlan();
 
 // ---- 加载三个 json（兼容 http 服务器 / 本地双击）----
-// routes.json（必需）, warehouses.json（仓库+货量）, warehouse-routes.json（对应关系）
+// routes.json（必需）, warehouses.json（仓库+货量）, warehouse_routes.json（对应关系）
 const FILES = [
   { name:"routes.json",          required:true,  ingest: data => { if(!Array.isArray(data)) throw new Error("不是数组"); initRoutes(data); } },
   { name:"warehouses.json",      required:false, ingest: data => initWarehouses(data) },
-  { name:"warehouse-routes.json",required:false, ingest: data => initMapping(data) },
+  { name:"warehouse_routes.json",required:false, ingest: data => initMapping(data) },
 ];
 
 function showFallback(missing){
