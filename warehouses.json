@@ -6,377 +6,377 @@
         {
             "name": "ABQ Warehouse",
             "id": 53,
-            "qty": 198
+            "qty": 208
         },
         {
             "name": "ALB Warehouse",
             "id": 57,
-            "qty": 7530
+            "qty": 8180
         },
         {
             "name": "ATL Warehouse",
             "id": 31,
-            "qty": 2444
+            "qty": 2600
         },
         {
             "name": "AUS Warehouse",
             "id": 21,
-            "qty": 636
+            "qty": 670
         },
         {
             "name": "AVP Warehouse",
             "id": 70,
-            "qty": 2945
+            "qty": 3235
         },
         {
             "name": "BFM Warehouse",
             "id": 66,
-            "qty": 477
+            "qty": 511
         },
         {
             "name": "BHM Warehouse",
             "id": 67,
-            "qty": 850
+            "qty": 929
         },
         {
             "name": "BIL Warehouse",
             "id": 75,
-            "qty": 51
+            "qty": 54
         },
         {
             "name": "BNA Warehouse",
             "id": 50,
-            "qty": 1306
+            "qty": 1366
         },
         {
             "name": "BOI Warehouse",
             "id": 56,
-            "qty": 148
+            "qty": 154
         },
         {
             "name": "BOS Warehouse",
             "id": 39,
-            "qty": 12377
+            "qty": 14000
         },
         {
             "name": "BTV Warehouse",
             "id": 82,
-            "qty": 308
+            "qty": 326
         },
         {
             "name": "BUF Warehouse",
             "id": 45,
-            "qty": 4004
+            "qty": 4462
         },
         {
             "name": "CAE Warehouse",
             "id": 62,
-            "qty": 510
+            "qty": 550
         },
         {
             "name": "CHS",
             "id": 46,
-            "qty": 1163
+            "qty": 1247
         },
         {
             "name": "CLE Warehouse",
             "id": 63,
-            "qty": 823
+            "qty": 903
         },
         {
             "name": "CLT Warehouse",
             "id": 34,
-            "qty": 1874
+            "qty": 2000
         },
         {
             "name": "CMH Warehouse",
             "id": 43,
-            "qty": 1233
+            "qty": 1293
         },
         {
             "name": "CVG Warehouse",
             "id": 33,
-            "qty": 775
+            "qty": 802
         },
         {
             "name": "DCA Warehouse",
             "id": 26,
-            "qty": 18366
+            "qty": 20971
         },
         {
             "name": "DEN Warehouse",
             "id": 42,
-            "qty": 612
+            "qty": 633
         },
         {
             "name": "DFW",
             "id": 4,
-            "qty": 2437
+            "qty": 2523
         },
         {
             "name": "DSM Warehouse",
             "id": 79,
-            "qty": 292
+            "qty": 307
         },
         {
             "name": "DTW Warehouse",
             "id": 73,
-            "qty": 1776
+            "qty": 1913
         },
         {
             "name": "ERI Warehouse",
             "id": 83,
-            "qty": 380
+            "qty": 445
         },
         {
             "name": "EUG Warehouse",
             "id": 64,
-            "qty": 88
+            "qty": 89
         },
         {
             "name": "FAY Warehouse",
             "id": 86,
-            "qty": 100
+            "qty": 107
         },
         {
             "name": "FWA Warehouse",
             "id": 77,
-            "qty": 263
+            "qty": 274
         },
         {
             "name": "GEG Warehouse",
             "id": 55,
-            "qty": 87
+            "qty": 89
         },
         {
             "name": "GNV Warehouse",
             "id": 54,
-            "qty": 250
+            "qty": 262
         },
         {
             "name": "GPT Warehouse",
             "id": 81,
-            "qty": 54
+            "qty": 57
         },
         {
             "name": "GSP Warehouse",
             "id": 61,
-            "qty": 753
+            "qty": 820
         },
         {
             "name": "IAH Warehouse",
             "id": 19,
-            "qty": 2309
+            "qty": 2417
         },
         {
             "name": "IND Warehouse",
             "id": 23,
-            "qty": 872
+            "qty": 900
         },
         {
             "name": "JAN Warehouse",
             "id": 76,
-            "qty": 92
+            "qty": 95
         },
         {
             "name": "JAX Warehouse",
             "id": 37,
-            "qty": 871
+            "qty": 913
         },
         {
             "name": "JFK Warehouse",
             "id": 17,
-            "qty": 14299
+            "qty": 15978
         },
         {
             "name": "LAS Warehouse",
             "id": 20,
-            "qty": 217
+            "qty": 231
         },
         {
             "name": "LAX Warehouse",
             "id": 1,
-            "qty": 2533
+            "qty": 2651
         },
         {
             "name": "LIT Warehouse",
             "id": 49,
-            "qty": 136
+            "qty": 143
         },
         {
             "name": "MCI Warehouse",
             "id": 47,
-            "qty": 534
+            "qty": 558
         },
         {
             "name": "MCO Warehouse",
             "id": 29,
-            "qty": 1379
+            "qty": 1483
         },
         {
             "name": "MDT Warehouse",
             "id": 58,
-            "qty": 6186
+            "qty": 7212
         },
         {
             "name": "MEM Warehouse",
             "id": 48,
-            "qty": 544
+            "qty": 565
         },
         {
             "name": "MIA Warehouse",
             "id": 2,
-            "qty": 2870
+            "qty": 3029
         },
         {
             "name": "MSO Warehouse",
             "id": 78,
-            "qty": 29
+            "qty": 30
         },
         {
             "name": "MSP Warehouse",
             "id": 36,
-            "qty": 969
+            "qty": 1004
         },
         {
             "name": "NJ Warehouse",
             "id": 18,
-            "qty": 20162
+            "qty": 21928
         },
         {
             "name": "OKC Warehouse",
             "id": 40,
-            "qty": 350
+            "qty": 363
         },
         {
             "name": "OMA Warehouse",
             "id": 69,
-            "qty": 714
+            "qty": 790
         },
         {
             "name": "ORD",
             "id": 3,
-            "qty": 3089
+            "qty": 3379
         },
         {
             "name": "PDX Warehouse",
             "id": 30,
-            "qty": 339
+            "qty": 356
         },
         {
             "name": "PGV Warehouse",
             "id": 85,
-            "qty": 154
+            "qty": 162
         },
         {
             "name": "PHL Warehouse",
             "id": 25,
-            "qty": 10469
+            "qty": 12346
         },
         {
             "name": "PHX Warehouse",
             "id": 16,
-            "qty": 610
+            "qty": 640
         },
         {
             "name": "PIT Warehouse",
             "id": 59,
-            "qty": 3534
+            "qty": 4035
         },
         {
             "name": "PWM Warehouse",
             "id": 74,
-            "qty": 1770
+            "qty": 1962
         },
         {
             "name": "RDU Warehouse",
             "id": 35,
-            "qty": 4474
+            "qty": 5069
         },
         {
             "name": "RIC Warehouse",
             "id": 52,
-            "qty": 9262
+            "qty": 10178
         },
         {
             "name": "RNO Warehouse",
             "id": 32,
-            "qty": 139
+            "qty": 146
         },
         {
             "name": "ROA Warehouse",
             "id": 80,
-            "qty": 622
+            "qty": 705
         },
         {
             "name": "SAT Warehouse",
             "id": 22,
-            "qty": 1069
+            "qty": 1139
         },
         {
             "name": "SAV Warehouse",
             "id": 44,
-            "qty": 287
+            "qty": 321
         },
         {
             "name": "SDF Warehouse",
             "id": 51,
-            "qty": 1496
+            "qty": 1569
         },
         {
             "name": "SEA Warehouse",
             "id": 27,
-            "qty": 730
+            "qty": 764
         },
         {
             "name": "SHD Warehouse",
             "id": 84,
-            "qty": 664
+            "qty": 733
         },
         {
             "name": "SJC",
             "id": 12,
-            "qty": 1278
+            "qty": 1336
         },
         {
             "name": "SLC Warehouse",
             "id": 41,
-            "qty": 472
+            "qty": 496
         },
         {
             "name": "SMF Warehouse",
             "id": 24,
-            "qty": 279
+            "qty": 289
         },
         {
             "name": "STL Warehouse",
             "id": 65,
-            "qty": 656
+            "qty": 688
         },
         {
             "name": "SYR Warehouse",
             "id": 71,
-            "qty": 1881
+            "qty": 2044
         },
         {
             "name": "TLH Warehouse",
             "id": 68,
-            "qty": 481
+            "qty": 527
         },
         {
             "name": "TPA Warehouse",
             "id": 38,
-            "qty": 1494
+            "qty": 1599
         },
         {
             "name": "TRI Warehouse",
             "id": 87,
-            "qty": 32
+            "qty": 36
         },
         {
             "name": "TYS Warehouse",
             "id": 60,
-            "qty": 318
+            "qty": 333
         }
     ]
 }
