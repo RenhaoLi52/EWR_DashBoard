@@ -1,11 +1,11 @@
 [
     {
         "route": "EWR600 > EWR936",
-        "count": 1532
+        "count": 1476
     },
     {
         "route": "EWR936 > EWR600",
-        "count": 1175
+        "count": 1147
     },
     {
         "route": "JFK175 > EWR600",
@@ -13,11 +13,7 @@
     },
     {
         "route": "LAX162 > PHX315",
-        "count": 206
-    },
-    {
-        "route": "EWR600 > PHL160",
-        "count": 186
+        "count": 202
     },
     {
         "route": "EWR600 > JFK175",
@@ -28,8 +24,12 @@
         "count": 184
     },
     {
+        "route": "EWR600 > PHL160",
+        "count": 174
+    },
+    {
         "route": "EWR936 > MIA307",
-        "count": 176
+        "count": 170
     },
     {
         "route": "DFW445 > BMO280 > ELP152",
@@ -37,63 +37,63 @@
     },
     {
         "route": "PHX315 > LAX162",
-        "count": 158
-    },
-    {
-        "route": "DFW445 > SAT493 > LRD601 > MFE517",
-        "count": 156
-    },
-    {
-        "route": "LAX162 > SJC449",
         "count": 154
     },
     {
-        "route": "LAX488 > DFW445",
-        "count": 147
+        "route": "DFW445 > SAT493 > LRD601 > MFE517",
+        "count": 153
     },
     {
-        "route": "LAX488 > EWR600",
+        "route": "LAX162 > SJC449",
+        "count": 151
+    },
+    {
+        "route": "LAX488 > DFW445",
         "count": 143
     },
     {
-        "route": "IAH129 > DFW445",
+        "route": "LAX488 > EWR600",
         "count": 141
     },
     {
-        "route": "LAX488 > SJC449",
-        "count": 139
+        "route": "IAH129 > DFW445",
+        "count": 138
     },
     {
-        "route": "EWR600 > DCA522",
-        "count": 125
+        "route": "LAX488 > SJC449",
+        "count": 135
     },
     {
         "route": "DFW445 > BMO280 > ELP696",
-        "count": 121
-    },
-    {
-        "route": "ORD121 > MSP372",
         "count": 120
     },
     {
-        "route": "ORD121 > EWR600",
-        "count": 116
+        "route": "EWR600 > DCA522",
+        "count": 119
+    },
+    {
+        "route": "ORD121 > MSP372",
+        "count": 118
     },
     {
         "route": "EWR600 > ERI345",
         "count": 116
     },
     {
-        "route": "EWR600 > DCA521",
-        "count": 115
-    },
-    {
         "route": "JFK175 > EWR936",
         "count": 115
     },
     {
-        "route": "DFW445 > IAH129",
+        "route": "ORD121 > EWR600",
         "count": 110
+    },
+    {
+        "route": "EWR600 > DCA521",
+        "count": 109
+    },
+    {
+        "route": "DFW445 > IAH129",
+        "count": 108
     },
     {
         "route": "LAX488 > ORD121",
@@ -101,14 +101,6 @@
     },
     {
         "route": "DEN423 > DFW445",
-        "count": 98
-    },
-    {
-        "route": "SJC449 > SJC345",
-        "count": 97
-    },
-    {
-        "route": "SJC449 > SJC406",
         "count": 96
     },
     {
@@ -116,27 +108,11 @@
         "count": 94
     },
     {
-        "route": "EWR600 > BDL045",
-        "count": 93
-    },
-    {
-        "route": "LAX162 > SEA662",
-        "count": 93
-    },
-    {
-        "route": "EWR600 > BOS001",
-        "count": 93
-    },
-    {
         "route": "MIA307 > FTM841",
         "count": 93
     },
     {
-        "route": "ORD121 > ATL441",
-        "count": 92
-    },
-    {
-        "route": "DFW445 > OKC100 > TUL694 > MCI490",
+        "route": "SJC449 > SJC406",
         "count": 92
     },
     {
@@ -144,60 +120,84 @@
         "count": 91
     },
     {
-        "route": "ATL441 > ORD121",
+        "route": "SJC449 > SJC345",
         "count": 90
     },
     {
+        "route": "DFW445 > OKC100 > TUL694 > MCI490",
+        "count": 90
+    },
+    {
+        "route": "ORD121 > ATL441",
+        "count": 90
+    },
+    {
+        "route": "LAX162 > SEA662",
+        "count": 89
+    },
+    {
+        "route": "ATL441 > ORD121",
+        "count": 88
+    },
+    {
+        "route": "EWR600 > BOS001",
+        "count": 87
+    },
+    {
+        "route": "EWR600 > BDL045",
+        "count": 87
+    },
+    {
         "route": "PIT017 > CLE689",
-        "count": 84
-    },
-    {
-        "route": "ATL441 > EWR600",
         "count": 82
-    },
-    {
-        "route": "SJC449 > LAX162",
-        "count": 82
-    },
-    {
-        "route": "LAX488 > SEA662",
-        "count": 81
     },
     {
         "route": "MFE517 > DFW445",
         "count": 81
     },
     {
-        "route": "EWR936 > ATL441",
+        "route": "SJC449 > LAX162",
+        "count": 80
+    },
+    {
+        "route": "LAX488 > SEA662",
+        "count": 79
+    },
+    {
+        "route": "ATL441 > EWR600",
         "count": 78
     },
     {
         "route": "ORD121 > OMA113",
-        "count": 78
+        "count": 76
     },
     {
         "route": "ORD121 > DTW450",
-        "count": 77
+        "count": 75
     },
     {
-        "route": "ORD121 > CVG505",
-        "count": 75
+        "route": "EWR936 > ATL441",
+        "count": 74
     },
     {
         "route": "ORD121 > STL958",
-        "count": 75
+        "count": 73
+    },
+    {
+        "route": "ORD121 > CVG505",
+        "count": 73
     },
     {
         "route": "DFW445 > ORD121",
         "count": 72
     },
     {
-        "route": "DFW445 > MCI490",
+        "route": "EWR936 > ORD121",
         "count": 70
     },
     {
-        "route": "EWR936 > ORD121",
-        "count": 70
+        "route": "DFW445 > DEN423",
+        "count": 69
     },
     {
         "route": "ORD121 > SDF115 > LEX102",
@@ -205,18 +205,6 @@
     },
     {
         "route": "ORD121 > LAX162",
-        "count": 68
-    },
-    {
-        "route": "DFW445 > DEN423",
-        "count": 68
-    },
-    {
-        "route": "DFW445 > LRD601 > MFE517",
-        "count": 68
-    },
-    {
-        "route": "ORD121 > MCI490 > DFW445",
         "count": 68
     },
     {
@@ -228,88 +216,92 @@
         "count": 68
     },
     {
+        "route": "DFW445 > MCI490",
+        "count": 66
+    },
+    {
+        "route": "DFW445 > LRD601 > MFE517",
+        "count": 66
+    },
+    {
+        "route": "ORD121 > MCI490 > DFW445",
+        "count": 66
+    },
+    {
         "route": "LAX162 > SLC260",
-        "count": 65
+        "count": 63
     },
     {
         "route": "DFW445 > SAT493",
-        "count": 65
-    },
-    {
-        "route": "ORD121 > IND515",
-        "count": 62
-    },
-    {
-        "route": "EWR600 > RDU550",
-        "count": 62
-    },
-    {
-        "route": "EWR600 > MDT185",
-        "count": 62
-    },
-    {
-        "route": "ATL441 > GSO215 > RDU550",
-        "count": 62
-    },
-    {
-        "route": "LAX488 > ATL441",
-        "count": 62
+        "count": 63
     },
     {
         "route": "ORD121 > CMH255",
         "count": 62
     },
     {
-        "route": "SJC449 > RNO131",
-        "count": 61
-    },
-    {
-        "route": "EWR936 > DFW445",
-        "count": 61
-    },
-    {
-        "route": "GEG380 > MSO550 > BIL149",
-        "count": 61
-    },
-    {
         "route": "IAH129 > BTR141",
         "count": 61
     },
     {
-        "route": "ATL441 > ATL760 > JAN166",
-        "count": 54
+        "route": "LAX488 > ATL441",
+        "count": 60
     },
     {
-        "route": "EWR600 > PIT017",
-        "count": 54
+        "route": "EWR936 > DFW445",
+        "count": 59
     },
     {
-        "route": "SLC260 > TWF234 > BOI146",
-        "count": 53
+        "route": "GEG380 > MSO550 > BIL149",
+        "count": 59
     },
     {
-        "route": "LAX162 > SJC449 > SEA662",
-        "count": 53
+        "route": "ORD121 > IND515",
+        "count": 58
+    },
+    {
+        "route": "EWR600 > MDT185",
+        "count": 58
+    },
+    {
+        "route": "ATL441 > GSO215 > RDU550",
+        "count": 58
+    },
+    {
+        "route": "EWR600 > RDU550",
+        "count": 58
+    },
+    {
+        "route": "SJC449 > RNO131",
+        "count": 57
     },
     {
         "route": "LAX162 > LAX713",
-        "count": 53
+        "count": 57
     },
     {
         "route": "IND515 > ORD121",
         "count": 53
     },
     {
-        "route": "SJC449 > SMF811",
+        "route": "LAX162 > SJC449 > SEA662",
         "count": 52
+    },
+    {
+        "route": "EWR600 > PIT017",
+        "count": 52
+    },
+    {
+        "route": "ATL441 > ATL760 > JAN166",
+        "count": 52
+    },
+    {
+        "route": "SLC260 > TWF234 > BOI146",
+        "count": 51
     },
     {
         "route": "ORD184 > ORD121",
         "count": 51
-    },
-    {
-        "route": "EWR936 > LAX162",
-        "count": 50
     },
     {
         "route": "DFW445 > OKC100",
@@ -320,11 +312,7 @@
         "count": 49
     },
     {
-        "route": "ATL441 > DFW445 > LAX162",
-        "count": 48
-    },
-    {
-        "route": "SJC449 > SJC676",
+        "route": "EWR936 > LAX162",
         "count": 48
     },
     {
@@ -332,7 +320,7 @@
         "count": 48
     },
     {
-        "route": "LAX162 > SLC260 > DEN423",
+        "route": "SJC449 > SMF811",
         "count": 47
     },
     {
@@ -346,10 +334,6 @@
     {
         "route": "EWR600 > CLT133",
         "count": 47
-    },
-    {
-        "route": "SEA662 > PDX199 > SJC449 > LAX162",
-        "count": 46
     },
     {
         "route": "JFK175 > JFK290",
@@ -400,10 +384,6 @@
         "count": 46
     },
     {
-        "route": "LAX488 > MIA307",
-        "count": 45
-    },
-    {
         "route": "EWR600 > ROA173",
         "count": 45
     },
@@ -416,11 +396,27 @@
         "count": 45
     },
     {
-        "route": "DFW445 > EWR600",
+        "route": "ATL441 > DFW445 > LAX162",
         "count": 44
     },
     {
-        "route": "IAH129 > ATL441",
+        "route": "SJC449 > SJC676",
+        "count": 44
+    },
+    {
+        "route": "LAX162 > SLC260 > DEN423",
+        "count": 43
+    },
+    {
+        "route": "LAX488 > MIA307",
+        "count": 43
+    },
+    {
+        "route": "DFW445 > EWR600",
+        "count": 43
+    },
+    {
+        "route": "SEA662 > PDX199 > SJC449 > LAX162",
         "count": 42
     },
     {
@@ -436,35 +432,19 @@
         "count": 42
     },
     {
-        "route": "LAX162 > SAN975",
-        "count": 41
+        "route": "IAH129 > ATL441",
+        "count": 40
     },
     {
         "route": "DFW445 > ABQ330 > LAX162",
-        "count": 41
+        "count": 40
     },
     {
         "route": "ELP152 > DFW445",
         "count": 40
     },
     {
-        "route": "EWR600 > AVP226",
-        "count": 39
-    },
-    {
-        "route": "ORD121 > MSN303 > RFD430",
-        "count": 39
-    },
-    {
-        "route": "ATL441 > ATL760",
-        "count": 39
-    },
-    {
-        "route": "LAX162 > ABQ330 > DFW445",
-        "count": 39
-    },
-    {
-        "route": "IAH129 > EWR600",
+        "route": "LAX162 > SAN975",
         "count": 39
     },
     {
@@ -472,75 +452,7 @@
         "count": 39
     },
     {
-        "route": "DFW445 > AUS205",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > TLM220",
-        "count": 38
-    },
-    {
-        "route": "LAX162 > LAX23B",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > AMA222 > LBB222",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > DFW417 > AUS205",
-        "count": 38
-    },
-    {
-        "route": "DEN423 > SLC260 > LAX162",
-        "count": 38
-    },
-    {
-        "route": "SAN975 > LAX162",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > LIT521 > MEM868",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > OKC100 > TUL135 > MCI490",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > OKC100 > TUL135",
-        "count": 38
-    },
-    {
-        "route": "DFW445 > DFW417 > AUS205 > SAT493",
-        "count": 38
-    },
-    {
-        "route": "SLC260 > LAX162",
-        "count": 38
-    },
-    {
-        "route": "EWR936 > CLE689 > CMH255",
-        "count": 38
-    },
-    {
-        "route": "LAX162 > LAX713 > LAX709",
-        "count": 38
-    },
-    {
-        "route": "LAX162 > LAX713 > LAX112 > LAX910",
-        "count": 38
-    },
-    {
-        "route": "LAX162 > LAX713 > LAX164",
-        "count": 38
-    },
-    {
-        "route": "LAX162 > LAX800",
-        "count": 38
-    },
-    {
-        "route": "LAX162 > LAX417",
+        "route": "IAH129 > EWR600",
         "count": 38
     },
     {
@@ -548,7 +460,95 @@
         "count": 38
     },
     {
+        "route": "LAX162 > ABQ330 > DFW445",
+        "count": 37
+    },
+    {
+        "route": "DFW445 > OKC100 > TUL135 > MCI490",
+        "count": 37
+    },
+    {
+        "route": "DFW445 > DFW417 > AUS205",
+        "count": 37
+    },
+    {
+        "route": "DFW445 > AMA222 > LBB222",
+        "count": 37
+    },
+    {
+        "route": "DFW445 > LIT521 > MEM868",
+        "count": 37
+    },
+    {
+        "route": "DFW445 > TLM220",
+        "count": 37
+    },
+    {
+        "route": "DFW445 > DFW417 > AUS205 > SAT493",
+        "count": 36
+    },
+    {
         "route": "IAH129 > MIA307",
+        "count": 36
+    },
+    {
+        "route": "DEN423 > SLC260 > LAX162",
+        "count": 36
+    },
+    {
+        "route": "LAX162 > LAX713 > LAX164",
+        "count": 36
+    },
+    {
+        "route": "LAX162 > LAX713 > LAX112 > LAX910",
+        "count": 36
+    },
+    {
+        "route": "LAX162 > LAX713 > LAX709",
+        "count": 36
+    },
+    {
+        "route": "DFW445 > AUS205",
+        "count": 36
+    },
+    {
+        "route": "EWR936 > CLE689 > CMH255",
+        "count": 36
+    },
+    {
+        "route": "SLC260 > LAX162",
+        "count": 36
+    },
+    {
+        "route": "ATL441 > ATL760",
+        "count": 36
+    },
+    {
+        "route": "LAX162 > LAX23B",
+        "count": 36
+    },
+    {
+        "route": "SAN975 > LAX162",
+        "count": 36
+    },
+    {
+        "route": "DFW445 > OKC100 > TUL135",
+        "count": 36
+    },
+    {
+        "route": "LAX162 > LAX417",
+        "count": 36
+    },
+    {
+        "route": "LAX162 > LAX800",
+        "count": 36
+    },
+    {
+        "route": "ORD121 > MSN303 > RFD430",
+        "count": 35
+    },
+    {
+        "route": "EWR600 > AVP226",
         "count": 35
     },
     {
@@ -558,150 +558,6 @@
     {
         "route": "SEA662 > BVS159",
         "count": 34
-    },
-    {
-        "route": "ATL441 > MIA307",
-        "count": 32
-    },
-    {
-        "route": "SEA662 > PDX199 > EUG415 > MFR587",
-        "count": 31
-    },
-    {
-        "route": "SLC260 > STG881 > LAX162",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > GSO215",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > PVD031 > PVD092",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > BHM900",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > HSV221",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > EVA700",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > JAN166",
-        "count": 31
-    },
-    {
-        "route": "SJC449 > SJC208",
-        "count": 31
-    },
-    {
-        "route": "ORD121 > FWA431",
-        "count": 31
-    },
-    {
-        "route": "ORD121 > CLE689",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > ALB025",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > PVD031",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > PVD092",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > MHT157",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > ATL760 > BHM900",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > BFM100",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > ABE113 > AVP226",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > ABE113",
-        "count": 31
-    },
-    {
-        "route": "ORD121 > SDF115",
-        "count": 31
-    },
-    {
-        "route": "GEG380 > BIL149",
-        "count": 31
-    },
-    {
-        "route": "SEA662 > GEG380",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > HSV221 > JAN166",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > BFM100 > PNS705",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > DOV077",
-        "count": 31
-    },
-    {
-        "route": "MIA307 > ATL441",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > RDU550",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > PNS705",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > BNA211",
-        "count": 31
-    },
-    {
-        "route": "EWR600 > BUF254",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > ILM112",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > CTG221 > EVA700",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > ILM112 > CLT133",
-        "count": 31
-    },
-    {
-        "route": "ORD121 > GRB396 > ATW801",
-        "count": 31
-    },
-    {
-        "route": "ATL441 > CLT133 > ILM112",
-        "count": 31
     },
     {
         "route": "ORD121 > EWR936",
@@ -760,7 +616,7 @@
         "count": 31
     },
     {
-        "route": "SJC449 > SMF811 > SJC345",
+        "route": "ATL441 > MIA307",
         "count": 30
     },
     {
@@ -792,20 +648,164 @@
         "count": 30
     },
     {
+        "route": "SEA662 > GEG380",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > JAN166",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > ABE113 > AVP226",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > ABE113",
+        "count": 29
+    },
+    {
+        "route": "MIA307 > ATL441",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > ATL760 > BHM900",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > BHM900",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > BFM100 > PNS705",
+        "count": 29
+    },
+    {
+        "route": "SEA662 > PDX199 > EUG415 > MFR587",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > ALB025",
+        "count": 29
+    },
+    {
+        "route": "SLC260 > STG881 > LAX162",
+        "count": 29
+    },
+    {
+        "route": "ORD121 > FWA431",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > PNS705",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > PVD092",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > BFM100",
+        "count": 29
+    },
+    {
+        "route": "ORD121 > CLE689",
+        "count": 29
+    },
+    {
+        "route": "ORD121 > SDF115",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > GSO215",
+        "count": 29
+    },
+    {
+        "route": "GEG380 > BIL149",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > HSV221",
+        "count": 29
+    },
+    {
+        "route": "SJC449 > SJC208",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > EVA700",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > HSV221 > JAN166",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > DOV077",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > PVD031 > PVD092",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > MHT157",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > PVD031",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > RDU550",
+        "count": 29
+    },
+    {
+        "route": "EWR600 > BUF254",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > ILM112 > CLT133",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > CTG221 > EVA700",
+        "count": 29
+    },
+    {
+        "route": "ORD121 > GRB396 > ATW801",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > CLT133 > ILM112",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > ILM112",
+        "count": 29
+    },
+    {
+        "route": "ATL441 > BNA211",
+        "count": 29
+    },
+    {
         "route": "LAX162 > LAX164",
-        "count": 28
+        "count": 29
+    },
+    {
+        "route": "SJC449 > SMF811 > SJC345",
+        "count": 27
     },
     {
         "route": "SLC260 > DEN423",
-        "count": 27
+        "count": 26
     },
     {
         "route": "ATL441 > DFW445",
         "count": 26
     },
     {
-        "route": "EWR600 > MHT157 > PWM240",
-        "count": 24
+        "route": "EWR600 > BTV485",
+        "count": 25
     },
     {
         "route": "ORD121 > ORD121",
@@ -992,18 +992,6 @@
         "count": 23
     },
     {
-        "route": "MIA307 > PBI240",
-        "count": 23
-    },
-    {
-        "route": "LAX162 > YMA214",
-        "count": 23
-    },
-    {
-        "route": "ATL441 > CAE131",
-        "count": 23
-    },
-    {
         "route": "ATL441 > TYS110",
         "count": 23
     },
@@ -1012,7 +1000,19 @@
         "count": 23
     },
     {
+        "route": "ATL441 > CAE131",
+        "count": 23
+    },
+    {
         "route": "JFK175 > JFK113",
+        "count": 23
+    },
+    {
+        "route": "MIA307 > PBI240",
+        "count": 23
+    },
+    {
+        "route": "LAX162 > YMA214",
         "count": 23
     },
     {
@@ -1120,6 +1120,10 @@
         "count": 20
     },
     {
+        "route": "EWR600 > MHT157 > PWM240",
+        "count": 18
+    },
+    {
         "route": "DFW445 > OKC100 > TUL694",
         "count": 18
     },
@@ -1140,18 +1144,6 @@
         "count": 17
     },
     {
-        "route": "MSY390 > IAH129",
-        "count": 16
-    },
-    {
-        "route": "EWR600 > ORF271",
-        "count": 16
-    },
-    {
-        "route": "EWR600 > RIC100",
-        "count": 16
-    },
-    {
         "route": "MCI490 > DFW445",
         "count": 16
     },
@@ -1164,12 +1156,20 @@
         "count": 16
     },
     {
-        "route": "LAX162 > PHX315 > ABQ330",
-        "count": 11
+        "route": "EWR600 > ORF271",
+        "count": 12
+    },
+    {
+        "route": "MSY390 > IAH129",
+        "count": 12
+    },
+    {
+        "route": "EWR600 > RIC100",
+        "count": 12
     },
     {
         "route": "IAH129 > LAX162",
-        "count": 10
+        "count": 11
     },
     {
         "route": "ATL441 > FAY420",
@@ -1180,67 +1180,15 @@
         "count": 10
     },
     {
+        "route": "LAX162 > PHX315 > ABQ330",
+        "count": 9
+    },
+    {
         "route": "EWR600 > SWF001 > SYR235",
         "count": 9
     },
     {
-        "route": "EWR600 > GSO215 > RDU550",
-        "count": 8
-    },
-    {
-        "route": "DFW445 > SAT493 > LRD111 > MFE517",
-        "count": 8
-    },
-    {
-        "route": "IAH129 > BTR141 > MSY390",
-        "count": 8
-    },
-    {
-        "route": "DFW445 > LRD111 > MFE517",
-        "count": 8
-    },
-    {
-        "route": "DFW445 > ELP696 > BMO280",
-        "count": 8
-    },
-    {
         "route": "IAH129 > MSY445",
-        "count": 8
-    },
-    {
-        "route": "SEA662 > EUG415",
-        "count": 8
-    },
-    {
-        "route": "EWR600 > SWF392 > SYR460",
-        "count": 8
-    },
-    {
-        "route": "EWR600 > ROC075 > BUF254",
-        "count": 8
-    },
-    {
-        "route": "ATL441 > CTG221",
-        "count": 8
-    },
-    {
-        "route": "EWR600 > SWF392",
-        "count": 8
-    },
-    {
-        "route": "EWR600 > PWM240",
-        "count": 8
-    },
-    {
-        "route": "EWR600 > SYR460",
-        "count": 8
-    },
-    {
-        "route": "ATL441 > MAC200",
-        "count": 8
-    },
-    {
-        "route": "ABQ330 > LAX162",
         "count": 8
     },
     {
@@ -1268,23 +1216,79 @@
         "count": 7
     },
     {
+        "route": "EWR600 > GSO215 > RDU550",
+        "count": 6
+    },
+    {
+        "route": "DFW445 > SAT493 > LRD111 > MFE517",
+        "count": 6
+    },
+    {
+        "route": "SEA662 > EUG415",
+        "count": 6
+    },
+    {
+        "route": "DFW445 > ELP696 > BMO280",
+        "count": 6
+    },
+    {
+        "route": "ABQ330 > LAX162",
+        "count": 6
+    },
+    {
+        "route": "DFW445 > LRD111 > MFE517",
+        "count": 6
+    },
+    {
+        "route": "IAH129 > BTR141 > MSY390",
+        "count": 6
+    },
+    {
+        "route": "EWR600 > ROC075 > BUF254",
+        "count": 6
+    },
+    {
+        "route": "EWR600 > SWF392",
+        "count": 6
+    },
+    {
+        "route": "EWR600 > SWF392 > SYR460",
+        "count": 6
+    },
+    {
+        "route": "EWR600 > PWM240",
+        "count": 6
+    },
+    {
+        "route": "ATL441 > MAC200",
+        "count": 6
+    },
+    {
+        "route": "EWR600 > SYR460",
+        "count": 6
+    },
+    {
+        "route": "ATL441 > CTG221",
+        "count": 6
+    },
+    {
         "route": "TOL255 > ORD121",
         "count": 6
+    },
+    {
+        "route": "DEN423 > LAX162",
+        "count": 5
     },
     {
         "route": "EWR600 > SWF392 > ALB025",
         "count": 4
     },
     {
-        "route": "DFW445 > DFW445",
-        "count": 3
-    },
-    {
         "route": "DFW445 > ATL441",
         "count": 3
     },
     {
-        "route": "DEN423 > LAX162",
+        "route": "DFW445 > DFW445",
         "count": 3
     },
     {
@@ -1365,6 +1369,10 @@
     },
     {
         "route": "PDX199 > EUG415 > PDX217 > PDX199",
+        "count": 1
+    },
+    {
+        "route": "LAX488 > LAX162",
         "count": 1
     }
 ]
