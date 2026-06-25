@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night Dispatch · 今日路线计划</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0c0e;
+    --panel:#141419;
+    --raised:#1b1b22;
+    --line:#2a2a32;
+    --line-soft:#202027;
+    --ink:#ece9e3;
+    --muted:#83838d;
+    --faint:#5b5b64;
+    --orange:#ec8b3c;
+    --orange-dim:#7a4d24;
+    --green:#5bb98c;
+    --green-dim:#2f5e48;
+    --red:#c96a5e;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Space Grotesk",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  input{font-family:var(--mono)}
+  ::selection{background:var(--orange);color:#1a1205}
+
+  /* ---- shell ---- */
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 60px}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px;flex-wrap:wrap}
+  .brand{display:flex;flex-direction:column;gap:3px}
+  .brand .kick{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--orange);font-weight:600}
+  .brand h1{margin:0;font-size:25px;font-weight:700;letter-spacing:-.01em}
+  .brand .sub{color:var(--muted);font-size:13px}
+  .date{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
+  .date b{color:var(--ink);font-weight:500}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+  @media(max-width:840px){.grid{grid-template-columns:1fr}}
+
+  .panel{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden}
+  .phead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  .phead .step{font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--orange);
+    width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-weight:700;flex:none}
+  .phead h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.01em}
+  .phead .hint{margin-left:auto;font-size:12px;color:var(--faint)}
+  .pbody{padding:16px}
+
+  /* ---- origin select ---- */
+  label.fld{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:7px;font-weight:600}
+  .selrow{display:flex;gap:10px;flex-wrap:wrap}
+  select.origin{flex:1;min-width:180px;appearance:none;background:var(--raised);border:1px solid var(--line);
+    color:var(--ink);font-family:var(--mono);font-size:14px;padding:11px 34px 11px 13px;border-radius:9px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%2383838d' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center}
+  select.origin:focus{outline:none;border-color:var(--orange)}
+
+  .search{width:100%;margin-top:14px;background:var(--raised);border:1px solid var(--line);
+    color:var(--ink);font-size:13px;padding:10px 12px;border-radius:9px}
+  .search:focus{outline:none;border-color:var(--orange)}
+  .search::placeholder{color:var(--faint)}
+
+  /* ---- route list ---- */
+  .rlist{margin-top:14px;max-height:430px;overflow-y:auto;border:1px solid var(--line-soft);border-radius:9px}
+  .rlist:empty::after{content:"先选一个起点";display:block;padding:34px 16px;text-align:center;color:var(--faint);font-size:13px}
+  .rrow{display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line-soft);
+    transition:background .12s}
+  .rrow:last-child{border-bottom:none}
+  .rrow:hover{background:var(--raised)}
+  .rrow .code{font-family:var(--mono);font-size:13.5px;color:var(--ink);flex:1;letter-spacing:-.01em}
+  .rrow .cnt{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .rrow .add{background:transparent;border:1px solid var(--line);color:var(--muted);
+    width:26px;height:26px;border-radius:7px;font-size:17px;line-height:1;display:grid;place-items:center;
+    flex:none;transition:.12s}
+  .rrow .add:hover{border-color:var(--orange);color:var(--orange)}
+  .rrow.added{opacity:.42}
+  .rrow.added .code{color:var(--green)}
+  .rrow.added .add{border-color:var(--green-dim);color:var(--green);pointer-events:none}
+  .nomatch{padding:26px 16px;text-align:center;color:var(--faint);font-size:13px}
+
+  /* ---- manifest ---- */
+  .mlist{display:flex;flex-direction:column}
+  .empty{padding:46px 18px;text-align:center;color:var(--faint)}
+  .empty .big{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:6px}
+  .mrow{border:1px solid var(--line-soft);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--raised)}
+  .mrow .mtop{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .mrow .mcode{font-family:var(--mono);font-size:13.5px;color:var(--ink);flex:1;font-weight:500;letter-spacing:-.01em}
+  .mrow .del{background:transparent;border:none;color:var(--faint);font-size:16px;padding:2px 5px;border-radius:6px;line-height:1}
+  .mrow .del:hover{color:var(--red);background:rgba(201,106,94,.1)}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .field input{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    font-size:14px;padding:8px 9px;border-radius:7px;width:100%;text-align:right}
+  .field input:focus{outline:none;border-color:var(--orange)}
+  .field.calc{justify-content:flex-end}
+  .field .out{font-family:var(--mono);font-size:14px;color:var(--green);text-align:right;padding:8px 2px;font-weight:500}
+
+  /* ---- totals + export ---- */
+  .totals{display:flex;gap:18px;padding:14px 16px;border-top:1px solid var(--line-soft);
+    background:var(--panel);flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat .n{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--ink);line-height:1}
+  .stat .l{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stat.accent .n{color:var(--orange)}
+
+  .actions{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:var(--raised);color:var(--ink);
+    padding:11px 16px;border-radius:9px;font-size:13px;font-weight:600;letter-spacing:.01em;transition:.14s}
+  .btn:hover{border-color:var(--muted)}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a1205;flex:1;min-width:140px}
+  .btn.primary:hover{background:#f59a4d;border-color:#f59a4d}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{color:var(--muted)}
+
+  /* ---- export sheet ---- */
+  .sheet{margin-top:22px;border:1px solid var(--line-soft);border-radius:12px;background:var(--panel);
+    overflow:hidden;display:none}
+  .sheet.show{display:block}
+  .shead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+  .shead h3{margin:0;font-size:13px;font-weight:600;font-family:var(--mono);color:var(--muted)}
+  .shead .copy{margin-left:auto;border:1px solid var(--line);background:var(--raised);color:var(--ink);
+    padding:7px 13px;border-radius:7px;font-size:12px;font-weight:600}
+  .shead .copy:hover{border-color:var(--orange);color:var(--orange)}
+  .shead .copy.done{border-color:var(--green);color:var(--green)}
+  pre{margin:0;padding:16px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#d6d3cc}
+  pre .k{color:var(--orange)}
+  pre .s{color:var(--green)}
+  pre .n{color:#9db4d6}
+
+  /* ---- import ---- */
+  .importbar{margin-top:14px}
+  .importbar summary{cursor:pointer;color:var(--muted);font-size:12.5px;list-style:none;
+    display:inline-flex;align-items:center;gap:6px}
+  .importbar summary::-webkit-details-marker{display:none}
+  .importbar summary:hover{color:var(--ink)}
+  .importbar textarea{width:100%;margin-top:10px;background:var(--raised);border:1px solid var(--line);
+    color:var(--ink);font-family:var(--mono);font-size:12px;padding:11px;border-radius:9px;min-height:90px;resize:vertical}
+  .importbar textarea:focus{outline:none;border-color:var(--orange)}
+  .importbar .irow{display:flex;gap:9px;margin-top:9px;align-items:center}
+  .importbar .msg{font-size:12px;color:var(--muted)}
+  .importbar .msg.err{color:var(--red)}
+  .importbar .msg.ok{color:var(--green)}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--raised);border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:10px;
+    font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .rlist::-webkit-scrollbar,pre::-webkit-scrollbar{height:8px;width:8px}
+  .rlist::-webkit-scrollbar-thumb,pre::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="kick">Night Dispatch</div>
+      <h1>今日路线计划</h1>
+      <div class="sub">选起点 → 挑路线 → 填车数与每车 pallet、重量 → 导出 PLAN</div>
+    </div>
+    <div class="date">今天<br><b id="today">—</b></div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: build -->
+    <section class="panel">
+      <div class="phead"><span class="step">1</span><h2>选起点 · 挑路线</h2><span class="hint" id="originHint"></span></div>
+      <div class="pbody">
+        <label class="fld" for="origin">起点 ORIGIN</label>
+        <div class="selrow">
+          <select class="origin" id="origin"><option value="">— 选择起点 —</option></select>
+        </div>
+        <input class="search" id="search" placeholder="在该起点下搜索路线…（如 JFK、MIA）" autocomplete="off">
+        <div class="rlist" id="rlist"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: manifest -->
+    <section class="panel">
+      <div class="phead"><span class="step">2</span><h2>今日计划</h2><span class="hint" id="planHint">0 条</span></div>
+      <div class="pbody" style="padding:14px 14px 4px">
+        <div class="mlist" id="mlist">
+          <div class="empty"><div class="big">计划是空的</div>从左边点 + 把路线加进来</div>
+        </div>
+      </div>
+      <div class="totals" id="totals" style="display:none">
+        <div class="stat"><span class="n" id="tRoutes">0</span><span class="l">路线</span></div>
+        <div class="stat accent"><span class="n" id="tTrucks">0</span><span class="l">车数</span></div>
+        <div class="stat"><span class="n" id="tPallets">0</span><span class="l">总 pallet</span></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="exportBtn" disabled>导出 PLAN</button>
+        <button class="btn ghost" id="clearBtn" disabled>清空</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- export sheet -->
+  <div class="sheet" id="sheet">
+    <div class="shead">
+      <h3>const PLAN</h3>
+      <button class="copy" id="copyBtn">复制</button>
+    </div>
+    <pre id="code"></pre>
+  </div>
+
+  <!-- import -->
+  <details class="importbar">
+    <summary>▸ 导入已有 PLAN 继续编辑</summary>
+    <textarea id="importText" placeholder='粘贴之前导出的 const PLAN = [ ... ];  或纯 JSON 数组'></textarea>
+    <div class="irow">
+      <button class="btn" id="importBtn">导入</button>
+      <span class="msg" id="importMsg"></span>
+    </div>
+  </details>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// 今日日期
+const d = new Date();
+const fmt = d.toLocaleDateString("en-CA"); // YYYY-MM-DD
+document.getElementById("today").textContent = fmt;
+
+// state：计划用 Map 保序，key=route
+const plan = new Map();
+
+const originSel = document.getElementById("origin");
+
+// ROUTES 改为从外部 routes.json 加载（见底部 loadRoutes）
+let ROUTES = [];
+let byOrigin = {};
+let origins = [];
+
+// 路线数据就绪后：构建起点映射、填充下拉
+function initRoutes(data){
+  // 兼容两种格式：[{route,count}] 或 [[route,count]]
+  ROUTES = data.map(r => Array.isArray(r) ? {route:r[0], count:r[1]} : {route:r.route, count:r.count});
+  byOrigin = {};
+  ROUTES.forEach(r=>{
+    const o = r.route.split(" > ")[0];
+    (byOrigin[o] ||= []).push(r);
+  });
+  origins = Object.keys(byOrigin).sort((a,b)=>byOrigin[b].length-byOrigin[a].length || a.localeCompare(b));
+
+  originSel.length = 1; // 保留占位 option
+  origins.forEach(o=>{
+    const opt = document.createElement("option");
+    opt.value = o;
+    opt.textContent = `${o}  ·  ${byOrigin[o].length} 条`;
+    originSel.appendChild(opt);
+  });
+  document.getElementById("originHint").textContent = `${origins.length} 个起点 · ${ROUTES.length} 条路线`;
+  curOrigin = ""; if(typeof renderRoutes==="function") renderRoutes();
+}
+
+// ---- 渲染路线列表 ----
+const rlist = document.getElementById("rlist");
+const search = document.getElementById("search");
+let curOrigin = "";
+
+function renderRoutes(){
+  rlist.innerHTML = "";
+  if(!curOrigin) return;
+  const q = search.value.trim().toUpperCase();
+  let list = byOrigin[curOrigin].slice().sort((a,b)=>b.count-a.count);
+  if(q) list = list.filter(r=>r.route.toUpperCase().includes(q));
+  if(!list.length){ rlist.innerHTML = '<div class="nomatch">没有匹配的路线</div>'; return; }
+  list.forEach(r=>{
+    const row = document.createElement("div");
+    row.className = "rrow" + (plan.has(r.route) ? " added":"");
+    row.innerHTML = `<span class="code">${r.route}</span>
+      <span class="cnt">${r.count}</span>
+      <button class="add" title="加入计划">${plan.has(r.route)?"✓":"+"}</button>`;
+    const addFn = ()=>{ if(!plan.has(r.route)){ addToPlan(r.route); } };
+    row.querySelector(".add").onclick = addFn;
+    row.querySelector(".code").onclick = addFn;
+    rlist.appendChild(row);
+  });
+}
+
+originSel.onchange = ()=>{ curOrigin = originSel.value; search.value=""; renderRoutes(); };
+search.oninput = renderRoutes;
+
+// ---- 计划操作 ----
+function addToPlan(route, trucks=1, palletPerTruck=""){
+  plan.set(route, {trucks, palletPerTruck});
+  renderPlan(); renderRoutes();
+  // 滚到新行并聚焦 pallet
+  requestAnimationFrame(()=>{
+    const el = document.querySelector(`[data-route="${cssEsc(route)}"] input.pal`);
+    if(el){ el.focus(); el.scrollIntoView({block:"nearest"}); }
+  });
+}
+function removeFromPlan(route){ plan.delete(route); renderPlan(); renderRoutes(); }
+function cssEsc(s){ return s.replace(/"/g,'\\"'); }
+
+const mlist = document.getElementById("mlist");
+function renderPlan(){
+  if(plan.size===0){
+    mlist.innerHTML = '<div class="empty"><div class="big">计划是空的</div>从左边点 + 把路线加进来</div>';
+  } else {
+    mlist.innerHTML = "";
+    for(const [route,v] of plan){
+      const row = document.createElement("div");
+      row.className = "mrow"; row.dataset.route = route;
+      const total = (Number(v.trucks)||0)*(Number(v.palletPerTruck)||0);
+      row.innerHTML = `
+        <div class="mtop">
+          <span class="mcode">${route}</span>
+          <button class="del" title="移除">✕</button>
+        </div>
+        <div class="fields">
+          <label class="field"><span>车数</span><input class="trk" type="number" min="1" step="1" value="${v.trucks}"></label>
+          <label class="field"><span>每车 pallet</span><input class="pal" type="number" min="0" step="1" value="${v.palletPerTruck}" placeholder="?"></label>
+        </div>`;
+      row.querySelector(".del").onclick = ()=>removeFromPlan(route);
+      const trk = row.querySelector(".trk"), pal = row.querySelector(".pal");
+      const upd = ()=>{ v.trucks=trk.value; v.palletPerTruck=pal.value; updTotals(); };
+      trk.oninput = upd; pal.oninput = upd;
+      mlist.appendChild(row);
+    }
+  }
+  updTotals();
+  document.getElementById("planHint").textContent = `${plan.size} 条`;
+  const has = plan.size>0;
+  document.getElementById("totals").style.display = has?"flex":"none";
+  document.getElementById("exportBtn").disabled = !has;
+  document.getElementById("clearBtn").disabled = !has;
+  if(!has) document.getElementById("sheet").classList.remove("show");
+}
+
+function updTotals(){
+  let trucks=0, pallets=0;
+  for(const v of plan.values()){
+    const t=Number(v.trucks)||0, p=Number(v.palletPerTruck)||0;
+    trucks+=t; pallets+=t*p;
+  }
+  document.getElementById("tRoutes").textContent = plan.size;
+  document.getElementById("tTrucks").textContent = trucks;
+  document.getElementById("tPallets").textContent = pallets;
+}
+
+// ---- 导出 ----
+function buildPlanString(){
+  let s = "const PLAN = [\n";
+  for(const [route,v] of plan){
+    const t = Number(v.trucks)||0;
+    const p = Number(v.palletPerTruck)||0;
+    s += `  { route: "${route}", trucks: ${t}, palletPerTruck: ${p} },\n`;
+  }
+  s += "];";
+  return s;
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function highlight(){
+  let html = "const PLAN = [\n";
+  for(const [route,v] of plan){
+    const t = Number(v.trucks)||0;
+    const p = Number(v.palletPerTruck)||0;
+    html += '  { '
+      + '<span class="k">route</span>: <span class="s">"'+esc(route)+'"</span>, '
+      + '<span class="k">trucks</span>: <span class="n">'+t+'</span>, '
+      + '<span class="k">palletPerTruck</span>: <span class="n">'+p+'</span>'
+      + ' },\n';
+  }
+  html += "];";
+  return html;
+}
+document.getElementById("exportBtn").onclick = ()=>{
+  // 校验：pallet 为空的提示
+  const missing = [...plan.entries()].filter(([,v])=>!(Number(v.palletPerTruck)>0)).map(([r])=>r);
+  document.getElementById("code").innerHTML = highlight();
+  document.getElementById("sheet").classList.add("show");
+  document.getElementById("sheet").scrollIntoView({behavior:"smooth",block:"nearest"});
+  document.getElementById("copyBtn").textContent = "复制";
+  document.getElementById("copyBtn").classList.remove("done");
+  if(missing.length) toast(`提醒：${missing.length} 条路线的每车 pallet 还是 0`);
+};
+document.getElementById("copyBtn").onclick = async ()=>{
+  try{
+    await navigator.clipboard.writeText(buildPlanString());
+    const b=document.getElementById("copyBtn"); b.textContent="已复制 ✓"; b.classList.add("done");
+    toast("PLAN 已复制到剪贴板");
+  }catch(e){ toast("复制失败，请手动选中"); }
+};
+document.getElementById("clearBtn").onclick = ()=>{
+  if(plan.size && confirm("清空当前计划？")){ plan.clear(); renderPlan(); renderRoutes(); document.getElementById("sheet").classList.remove("show"); }
+};
+
+// ---- 导入 ----
+document.getElementById("importBtn").onclick = ()=>{
+  const txt = document.getElementById("importText").value.trim();
+  const msg = document.getElementById("importMsg");
+  if(!txt){ msg.className="msg err"; msg.textContent="请先粘贴内容"; return; }
+  try{
+    let m = txt.match(/\[[\s\S]*\]/);
+    if(!m) throw new Error("找不到数组");
+    let jsonish = m[0]
+      .replace(/(\w+)\s*:/g,'"$1":')      // key 加引号
+      .replace(/,\s*]/g,"]").replace(/,\s*}/g,"}");
+    const arr = JSON.parse(jsonish);
+    if(!Array.isArray(arr)) throw new Error("不是数组");
+    plan.clear();
+    arr.forEach(o=>{
+      if(o && o.route) plan.set(o.route, {
+        trucks: o.trucks??1,
+        palletPerTruck: o.palletPerTruck??""
+      });
+    });
+    renderPlan(); renderRoutes();
+    msg.className="msg ok"; msg.textContent=`已导入 ${plan.size} 条`;
+  }catch(e){ msg.className="msg err"; msg.textContent="解析失败："+e.message; }
+};
+
+// ---- toast ----
+let toastT;
+function toast(t){
+  const el=document.getElementById("toast"); el.textContent=t; el.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),2200);
+}
+
+renderPlan();
+
+// ---- 加载 routes.json（兼容 http 服务器 / 本地双击两种打开方式）----
+function showFallbackPicker(msg){
+  const body = document.querySelector(".panel .pbody"); // 左侧面板 body
+  if(document.getElementById("routeLoader")) return; // 避免重复
+  const box = document.createElement("div");
+  box.id = "routeLoader";
+  box.style.cssText = "margin-bottom:14px;padding:13px;border:1px solid var(--orange-dim);"
+    + "border-radius:9px;background:rgba(236,139,60,.07)";
+  box.innerHTML = '<div style="font-size:12.5px;color:var(--ink);margin-bottom:9px;line-height:1.5">'
+    + (msg||"无法自动读取 routes.json") + '</div>'
+    + '<label class="btn" style="display:inline-block;cursor:pointer;font-size:12px;padding:8px 13px">'
+    + '选择 routes.json<input id="routeFile" type="file" accept=".json,application/json" style="display:none"></label>'
+    + '<span id="routeFileMsg" style="margin-left:10px;font-size:12px;color:var(--muted)"></span>';
+  body.insertBefore(box, body.firstChild);
+  document.getElementById("routeFile").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const data = JSON.parse(reader.result);
+        if(!Array.isArray(data)) throw new Error("不是数组");
+        initRoutes(data);
+        document.getElementById("routeFileMsg").textContent = `已加载 ${data.length} 条`;
+        document.getElementById("routeFileMsg").style.color = "var(--green)";
+      }catch(err){
+        document.getElementById("routeFileMsg").textContent = "解析失败：" + err.message;
+        document.getElementById("routeFileMsg").style.color = "var(--red)";
+      }
+    };
+    reader.readAsText(f);
+  });
+}
+
+function loadRoutes(){
+  fetch("routes.json")
+    .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    .then(data => {
+      if(!Array.isArray(data)) throw new Error("routes.json 不是数组");
+      initRoutes(data);
+    })
+    .catch(err => {
+      // 双击 file:// 打开时 fetch 会被浏览器拦截，走手动选择回退
+      showFallbackPicker(
+        "无法自动读取同目录的 routes.json（多为双击打开所致）。<br>"
+        + "请点下方按钮手动选择 routes.json；<b>或</b>用本地服务器打开本页即可自动读取。"
+      );
+    });
+}
+loadRoutes();
+</script>
+</body>
+</html>
