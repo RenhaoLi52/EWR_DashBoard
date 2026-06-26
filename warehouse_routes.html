@@ -159,7 +159,7 @@
       <h1>仓库路线分配</h1>
       <div class="sub">选仓库 → 分配它负责的路线 → 导出对应关系</div>
     </div>
-    <div class="filestat" id="filestat">routes.json <span id="rStat" class="bad">…</span><br>warehouses.json <span id="wStat" class="bad">…</span></div>
+    <div class="filestat" id="filestat">routes.json <span id="rStat" class="bad">…</span><br>warehouses.json <span id="wStat" class="bad">…</span><br>warehouse_routes.json <span id="mStat" class="bad">…</span></div>
   </header>
 
   <div class="loader" id="loader">
@@ -401,7 +401,8 @@ function afterLoad(){
   }
 }
 function setStat(which, ok, n){
-  const el = $(which==="routes"?"rStat":"wStat");
+  const id = which==="routes" ? "rStat" : which==="wh" ? "wStat" : "mStat";
+  const el = $(id);
   el.className = ok?"ok":"bad"; el.textContent = ok?`✓ ${n}`:"未加载";
 }
 function ingestRoutes(data){
@@ -413,6 +414,18 @@ function ingestWarehouses(raw){
   if(!data) throw new Error("warehouses.json 结构不对（需要数组或 {data:[...]}）");
   WAREHOUSES = data.map(w=>({name:w.name, id:w.id, qty:w.qty}));
   loaded.wh=true; setStat("wh",true,WAREHOUSES.length+" 个"); afterLoad();
+}
+// 自动加载已有的对应关系（本工具导出的格式），有就接着编辑，没有就从 0 开始
+function ingestMapping(arr){
+  if(!Array.isArray(arr)) throw new Error("warehouse_routes.json 应为数组");
+  assign.clear();
+  arr.forEach(o=>{
+    let wid = o.warehouse_id;
+    if(wid==null && o.warehouse && WAREHOUSES.length){ const w=WAREHOUSES.find(w=>w.name===o.warehouse); wid=w&&w.id; }
+    if(wid!=null && Array.isArray(o.routes) && o.routes.length) assign.set(wid, o.routes.slice());
+  });
+  setStat("mapping", true, assign.size+" 仓");
+  afterLoad();
 }
 
 function tryFetch(file, onok){
@@ -433,7 +446,7 @@ function wirerPicker(inputId, btnId, ingest, label){
 wirerPicker("pickRoutes","pickRoutesBtn",ingestRoutes,"routes.json");
 wirerPicker("pickWh","pickWhBtn",ingestWarehouses,"warehouses.json");
 
-// 启动：先尝试自动读取
+// 启动：先尝试自动读取（routes / warehouses 必需，warehouse_routes 可选）
 Promise.allSettled([
   tryFetch("routes.json", ingestRoutes),
   tryFetch("warehouses.json", ingestWarehouses)
@@ -445,6 +458,10 @@ Promise.allSettled([
       + "需要两个文件：<b>routes.json</b>（路线）和 <b>warehouses.json</b>（仓库，即你那份带 data 的 json）。");
   }
 });
+
+// 可选：同目录若有 warehouse_routes.json（本工具导出的对应关系），自动载入接着编辑；没有就保持空白
+tryFetch("warehouse_routes.json", ingestMapping)
+  .catch(()=>{ setStat("mapping", false); });   // 文件不存在很正常，静默处理，从 0 开始
 </script>
 </body>
 </html>
