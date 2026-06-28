@@ -103,10 +103,21 @@
   .empty{padding:46px 18px;text-align:center;color:var(--faint)}
   .empty .big{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:6px}
   .mrow{border:1px solid var(--line-soft);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--raised)}
-  .mrow .mtop{display:flex;align-items:center;gap:10px;margin-bottom:11px}
-  .mrow .mcode{font-family:var(--mono);font-size:13.5px;color:var(--ink);flex:1;font-weight:500;letter-spacing:-.01em}
+  .mrow .mtop{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+  .mrow .grip{flex:none;display:grid;place-items:center;width:22px;height:24px;
+    border:none;background:transparent;color:var(--faint);border-radius:6px;
+    cursor:grab;touch-action:none;transition:color .12s,background .12s}
+  .mrow .grip:hover{color:var(--muted);background:var(--panel)}
+  .mrow .grip:active{cursor:grabbing}
+  .mrow .ord{flex:none;font-family:var(--mono);font-size:11px;font-weight:600;
+    color:var(--faint);min-width:18px;text-align:right;letter-spacing:.02em}
+  .mrow .mcode{font-family:var(--mono);font-size:13.5px;color:var(--ink);flex:1;font-weight:500;letter-spacing:-.01em;cursor:grab;touch-action:none}
   .mrow .del{background:transparent;border:none;color:var(--faint);font-size:16px;padding:2px 5px;border-radius:6px;line-height:1}
   .mrow .del:hover{color:var(--red);background:rgba(201,106,94,.1)}
+  .mrow.dragging{border-color:var(--orange);box-shadow:0 12px 28px rgba(0,0,0,.5);
+    opacity:.98;position:relative;z-index:5;cursor:grabbing}
+  .mrow.dragging .grip,.mrow.dragging .ord{color:var(--orange)}
+  .mlist.is-sorting .mrow:not(.dragging){transition:transform .14s ease}
   .fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .field{display:flex;flex-direction:column;gap:5px}
   .field span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -132,6 +143,15 @@
   .btn.primary:hover{background:#f59a4d;border-color:#f59a4d}
   .btn:disabled{opacity:.4;cursor:not-allowed}
   .btn.ghost{color:var(--muted)}
+
+  /* ---- template bar ---- */
+  .tplbar{display:flex;align-items:center;gap:11px;margin-bottom:12px;padding:10px 12px;
+    border:1px solid var(--orange-dim);border-radius:9px;background:rgba(236,139,60,.07);flex-wrap:wrap}
+  .tplbar .btn.tpl{padding:8px 14px;font-size:12.5px;border-color:var(--orange);
+    color:var(--orange);background:var(--raised)}
+  .tplbar .btn.tpl:hover{background:var(--orange);color:#1a1205;border-color:var(--orange)}
+  .tplbar .btn.tpl:disabled{opacity:.4;cursor:not-allowed}
+  .tplbar .tplmeta{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
 
   /* ---- export sheet ---- */
   .sheet{margin-top:22px;border:1px solid var(--line-soft);border-radius:12px;background:var(--panel);
@@ -211,6 +231,10 @@
     <section class="panel">
       <div class="phead"><span class="step">2</span><h2>今日计划</h2><span class="hint" id="planHint">0 条</span></div>
       <div class="pbody" style="padding:14px 14px 4px">
+        <div class="tplbar" id="tplBar" style="display:none">
+          <button class="btn tpl" id="templateBtn" disabled>⚡ 套用模板生成</button>
+          <span class="tplmeta" id="tplMeta"></span>
+        </div>
         <div class="mlist" id="mlist">
           <div class="empty"><div class="big">计划是空的</div>从左边点 + 把路线加进来</div>
         </div>
@@ -404,6 +428,8 @@ function renderPlan(){
       const total = (Number(v.trucks)||0)*(Number(v.palletPerTruck)||0);
       row.innerHTML = `
         <div class="mtop">
+          <button class="grip" title="拖动调整顺序" aria-label="拖动调整顺序"><svg width="11" height="15" viewBox="0 0 11 15" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.3"/><circle cx="8.5" cy="2.5" r="1.3"/><circle cx="2.5" cy="7.5" r="1.3"/><circle cx="8.5" cy="7.5" r="1.3"/><circle cx="2.5" cy="12.5" r="1.3"/><circle cx="8.5" cy="12.5" r="1.3"/></svg></button>
+          <span class="ord"></span>
           <span class="mcode">${route}</span>
           <button class="del" title="移除">✕</button>
         </div>
@@ -417,9 +443,10 @@ function renderPlan(){
       trk.oninput = upd; pal.oninput = upd;
       mlist.appendChild(row);
     }
+    renumber();
   }
   updTotals();
-  document.getElementById("planHint").textContent = `${plan.size} 条`;
+  document.getElementById("planHint").textContent = plan.size>=2 ? `${plan.size} 条 · 拖动排序` : `${plan.size} 条`;
   const has = plan.size>0;
   document.getElementById("totals").style.display = has?"flex":"none";
   document.getElementById("exportBtn").disabled = !has;
@@ -485,19 +512,25 @@ document.getElementById("clearBtn").onclick = ()=>{
   if(plan.size && confirm("清空当前计划？")){ plan.clear(); renderPlan(); renderRoutes(); document.getElementById("sheet").classList.remove("show"); }
 };
 
+// 宽松解析：接受纯 JSON 数组，或 const PLAN = [ ... ]; 这样的 JS 文本
+function parsePlanish(txt){
+  const m = String(txt).match(/\[[\s\S]*\]/);
+  if(!m) throw new Error("找不到数组");
+  const jsonish = m[0]
+    .replace(/(\w+)\s*:/g,'"$1":')        // 给未加引号的 key 补引号
+    .replace(/,\s*]/g,"]").replace(/,\s*}/g,"}");
+  const arr = JSON.parse(jsonish);
+  if(!Array.isArray(arr)) throw new Error("不是数组");
+  return arr;
+}
+
 // ---- 导入 ----
 document.getElementById("importBtn").onclick = ()=>{
   const txt = document.getElementById("importText").value.trim();
   const msg = document.getElementById("importMsg");
   if(!txt){ msg.className="msg err"; msg.textContent="请先粘贴内容"; return; }
   try{
-    let m = txt.match(/\[[\s\S]*\]/);
-    if(!m) throw new Error("找不到数组");
-    let jsonish = m[0]
-      .replace(/(\w+)\s*:/g,'"$1":')      // key 加引号
-      .replace(/,\s*]/g,"]").replace(/,\s*}/g,"}");
-    const arr = JSON.parse(jsonish);
-    if(!Array.isArray(arr)) throw new Error("不是数组");
+    const arr = parsePlanish(txt);
     plan.clear();
     arr.forEach(o=>{
       if(o && o.route) plan.set(o.route, {
@@ -517,14 +550,121 @@ function toast(t){
   clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),2200);
 }
 
+// ---- 拖动排序：顺序 = 导出 / 执行顺序 ----
+function renumber(){
+  mlist.querySelectorAll(".mrow").forEach((r,i)=>{
+    const o = r.querySelector(".ord");
+    if(o) o.textContent = String(i+1).padStart(2,"0");
+  });
+}
+
+// 拖完后把 DOM 顺序写回 plan（Map 保序）；值对象引用不变，输入绑定继续有效
+function syncPlanOrderFromDOM(){
+  const order = [...mlist.querySelectorAll(".mrow")].map(r=>r.dataset.route);
+  const entries = [];
+  order.forEach(route=>{ if(plan.has(route)) entries.push([route, plan.get(route)]); });
+  plan.clear();
+  entries.forEach(([k,v])=>plan.set(k,v));
+  renumber();
+  // 若导出区已打开，立即按新顺序刷新
+  const sheet = document.getElementById("sheet");
+  if(sheet.classList.contains("show")) document.getElementById("code").innerHTML = highlight();
+}
+
+// 指针 Y 应插入到哪一行之前（null = 末尾）
+function rowAfterPointer(y){
+  const rows = [...mlist.querySelectorAll(".mrow:not(.dragging)")];
+  let closest = null, closestOffset = -Infinity;
+  for(const row of rows){
+    const box = row.getBoundingClientRect();
+    const offset = y - (box.top + box.height/2);
+    if(offset < 0 && offset > closestOffset){ closestOffset = offset; closest = row; }
+  }
+  return closest;
+}
+
+function enableDragSort(){
+  let dragEl = null;
+  mlist.addEventListener("pointerdown", e=>{
+    if(e.button!==undefined && e.button!==0) return;          // 仅左键/触摸
+    const handle = e.target.closest(".grip, .mcode");
+    if(!handle) return;
+    const row = handle.closest(".mrow");
+    if(!row || mlist.querySelectorAll(".mrow").length < 2) return;
+    e.preventDefault();
+    dragEl = row;
+    row.classList.add("dragging");
+    mlist.classList.add("is-sorting");
+    handle.setPointerCapture && handle.setPointerCapture(e.pointerId);
+    document.body.style.userSelect = "none";
+  });
+  mlist.addEventListener("pointermove", e=>{
+    if(!dragEl) return;
+    const after = rowAfterPointer(e.clientY);
+    if(after == null){
+      if(mlist.lastElementChild !== dragEl) mlist.appendChild(dragEl);
+    } else if(after !== dragEl && after.previousElementSibling !== dragEl){
+      mlist.insertBefore(dragEl, after);
+    }
+    renumber();
+  });
+  const end = ()=>{
+    if(!dragEl) return;
+    dragEl.classList.remove("dragging");
+    mlist.classList.remove("is-sorting");
+    dragEl = null;
+    document.body.style.userSelect = "";
+    syncPlanOrderFromDOM();
+    updTotals();
+  };
+  mlist.addEventListener("pointerup", end);
+  mlist.addEventListener("pointercancel", end);
+}
+enableDragSort();
+
 renderPlan();
 
-// ---- 加载三个 json（兼容 http 服务器 / 本地双击）----
-// routes.json（必需）, warehouses.json（仓库+货量）, warehouse_routes.json（对应关系）
+// ---- 模板：一键生成今日计划 ----
+let TEMPLATE = [];
+function initTemplate(input){
+  // 接受数组 / {data:[...]} / const PLAN 文本
+  let arr = Array.isArray(input) ? input
+    : (input && Array.isArray(input.data) ? input.data
+    : (typeof input === "string" ? parsePlanish(input) : null));
+  if(!arr) throw new Error("template 需为数组或 const PLAN 文本");
+  TEMPLATE = arr.filter(o=>o && o.route).map(o=>({
+    route: o.route,
+    trucks: o.trucks ?? 1,
+    palletPerTruck: (o.palletPerTruck ?? o.pallet ?? "")
+  }));
+  refreshTemplateUI();
+}
+function refreshTemplateUI(){
+  const bar = document.getElementById("tplBar");
+  const btn = document.getElementById("templateBtn");
+  if(!TEMPLATE.length){ bar.style.display = "none"; return; }
+  bar.style.display = "flex";
+  btn.disabled = false;
+  document.getElementById("tplMeta").textContent = `${TEMPLATE.length} 条模板路线`;
+}
+function applyTemplate(){
+  if(!TEMPLATE.length) return;
+  if(plan.size && !confirm(`用模板覆盖当前计划？现有 ${plan.size} 条将被替换。`)) return;
+  plan.clear();
+  TEMPLATE.forEach(t=> plan.set(t.route, { trucks:t.trucks, palletPerTruck:t.palletPerTruck }));
+  renderPlan(); renderRoutes();
+  document.getElementById("sheet").classList.remove("show");
+  toast(`已套用模板：${plan.size} 条，可继续拖动 / 修改`);
+}
+document.getElementById("templateBtn").onclick = applyTemplate;
+
+// ---- 加载 json（兼容 http 服务器 / 本地双击）----
+// routes.json（必需）, warehouses.json（仓库+货量）, warehouse_routes.json（对应关系）, template.json（模板）
 const FILES = [
   { name:"routes.json",          required:true,  ingest: data => { if(!Array.isArray(data)) throw new Error("不是数组"); initRoutes(data); } },
   { name:"warehouses.json",      required:false, ingest: data => initWarehouses(data) },
   { name:"warehouse_routes.json",required:false, ingest: data => initMapping(data) },
+  { name:"template.json",        required:false, asText:true, ingest: txt => initTemplate(txt) },
 ];
 
 function showFallback(missing){
@@ -549,7 +689,7 @@ function showFallback(missing){
       const file=e.target.files[0]; if(!file) return;
       const rd=new FileReader();
       rd.onload=()=>{
-        try{ f.ingest(JSON.parse(rd.result));
+        try{ f.ingest(f.asText ? rd.result : JSON.parse(rd.result));
           document.getElementById("pk"+i).style.borderColor="var(--green)";
           document.getElementById("pk"+i).style.color="var(--green)";
           document.getElementById("pkMsg").textContent = f.name+" 已加载";
@@ -566,7 +706,7 @@ function showFallback(missing){
 
 function loadAll(){
   Promise.allSettled(FILES.map(f =>
-    fetch(f.name).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    fetch(f.name).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return f.asText ? r.text() : r.json(); })
       .then(data=>{ f.ingest(data); return true; })
   )).then(res=>{
     const missing = [];
