@@ -1,0 +1,99 @@
+/* ============================================================
+   UNITRANS Dispatch Suite — 共享主题
+   三个页面 (index / warehouse_routes / bol-dispatch-board)
+   共用的配色令牌 + 顶部导航栏。改配色只改这里。
+   ============================================================ */
+
+:root{
+  /* —— 表面 / 线条 —— */
+  --bg:#0c0c0e;
+  --panel:#141419;
+  --raised:#1b1b22;
+  --line:#2a2a32;
+  --line-soft:#202027;
+
+  /* —— 文字 —— */
+  --ink:#ece9e3;
+  --muted:#83838d;
+  --faint:#5b5b64;
+
+  /* —— 强调色 —— */
+  --orange:#ec8b3c;
+  --orange-dim:#7a4d24;
+  --green:#5bb98c;
+  --green-dim:#2f5e48;
+  --blue:#6f9fd8;
+  --red:#c96a5e;
+
+  /* —— 字体 —— */
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Space Grotesk",system-ui,-apple-system,sans-serif;
+
+  --nav-h:54px;
+}
+
+::selection{background:var(--orange);color:#1a1205}
+
+/* ============================================================
+   顶部导航栏
+   ============================================================ */
+.globalnav{
+  position:sticky;top:0;z-index:60;
+  background:rgba(12,12,14,.82);
+  backdrop-filter:saturate(140%) blur(10px);
+  -webkit-backdrop-filter:saturate(140%) blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.gn-inner{
+  max-width:1280px;margin:0 auto;height:var(--nav-h);
+  display:flex;align-items:center;gap:22px;padding:0 22px;
+}
+.gn-brand{
+  display:inline-flex;align-items:center;gap:10px;text-decoration:none;flex:none;
+}
+.gn-badge{
+  font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.04em;
+  background:var(--orange);color:#1a1300;padding:4px 8px;border-radius:5px;line-height:1;
+}
+.gn-sysname{
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);font-weight:500;
+}
+@media(max-width:560px){.gn-sysname{display:none}}
+
+.gn-links{display:flex;align-items:stretch;gap:2px;margin-left:auto;height:100%}
+.gn-links a{
+  position:relative;display:inline-flex;align-items:center;gap:7px;
+  height:100%;padding:0 13px;text-decoration:none;
+  font-family:var(--sans);font-size:13px;font-weight:500;letter-spacing:.01em;
+  color:var(--muted);transition:color .14s;white-space:nowrap;
+}
+.gn-links a .dot{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background .14s;flex:none}
+.gn-links a:hover{color:var(--ink)}
+.gn-links a:hover .dot{background:var(--muted)}
+.gn-links a::after{
+  content:"";position:absolute;left:13px;right:13px;bottom:0;height:2px;
+  background:transparent;border-radius:2px 2px 0 0;transition:background .14s;
+}
+.gn-links a:focus-visible{outline:2px solid var(--orange);outline-offset:-2px;border-radius:6px}
+
+/* 当前页高亮：由 <body data-page="..."> 决定 */
+body[data-page="plan"] .gn-links a[data-nav="plan"],
+body[data-page="wh"]   .gn-links a[data-nav="wh"],
+body[data-page="bol"]  .gn-links a[data-nav="bol"]{color:var(--ink);font-weight:600}
+body[data-page="plan"] .gn-links a[data-nav="plan"] .dot,
+body[data-page="wh"]   .gn-links a[data-nav="wh"] .dot,
+body[data-page="bol"]  .gn-links a[data-nav="bol"] .dot{background:var(--orange)}
+body[data-page="plan"] .gn-links a[data-nav="plan"]::after,
+body[data-page="wh"]   .gn-links a[data-nav="wh"]::after,
+body[data-page="bol"]  .gn-links a[data-nav="bol"]::after{background:var(--orange)}
+
+@media(max-width:480px){
+  .gn-inner{gap:10px;padding:0 12px}
+  .gn-links a{padding:0 8px;font-size:12px}
+  .gn-links a::after{left:8px;right:8px}
+}
+
+@media (prefers-reduced-motion: reduce){
+  .gn-links a,.gn-links a .dot,.gn-links a::after{transition:none}
+}
