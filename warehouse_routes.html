@@ -7,17 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
 <style>
-  :root{
-    --bg:#0c0c0e; --panel:#141419; --raised:#1b1b22;
-    --line:#2a2a32; --line-soft:#202027;
-    --ink:#ece9e3; --muted:#83838d; --faint:#5b5b64;
-    --orange:#ec8b3c; --orange-dim:#7a4d24;
-    --green:#5bb98c; --green-dim:#2f5e48;
-    --blue:#6f9fd8; --red:#c96a5e;
-    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:"Space Grotesk",system-ui,-apple-system,sans-serif;
-  }
+  /* 配色令牌与导航栏在 shared.css 中统一定义 */
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
   body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
@@ -151,7 +143,20 @@
   .scroll::-webkit-scrollbar-thumb,pre::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
 </style>
 </head>
-<body>
+<body data-page="wh">
+<nav class="globalnav">
+  <div class="gn-inner">
+    <a class="gn-brand" href="index.html">
+      <span class="gn-badge">UNITRANS</span>
+      <span class="gn-sysname">Dispatch Suite</span>
+    </a>
+    <div class="gn-links">
+      <a href="index.html" data-nav="plan"><span class="dot"></span>今日路线计划</a>
+      <a href="warehouse_routes.html" data-nav="wh"><span class="dot"></span>仓库分配</a>
+      <a href="bol-dispatch-board.html" data-nav="bol"><span class="dot"></span>BOL 调度板</a>
+    </div>
+  </div>
+</nav>
 <div class="wrap">
   <header class="top">
     <div class="brand">
