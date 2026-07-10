@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Night Dispatch · 路线数量统计</title>
+<title>Night Dispatch · 数量统计</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -11,16 +11,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-  /* 配色令牌与导航栏在 shared.css 中统一定义 */
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
   body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
   button{font-family:inherit;cursor:pointer}
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-
   .wrap{max-width:1180px;margin:0 auto;padding:26px 22px 70px}
-
-  /* ---- header ---- */
   header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
     border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap}
   .brand{display:flex;flex-direction:column;gap:3px}
@@ -31,8 +27,6 @@
   .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
   .dot.ok{background:var(--green)}
   .dot.err{background:var(--red)}
-
-  /* ---- controls ---- */
   .controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
   .fld{display:flex;flex-direction:column;gap:6px}
   .fld label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -51,8 +45,6 @@
   .btn.ghost{background:transparent;color:var(--muted)}
   .btn.ghost:hover{color:var(--ink)}
   .spacer{flex:1 1 auto}
-
-  /* ---- series chips ---- */
   .chips{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
   .chips .hint{color:var(--faint);font-size:12px}
   .chip{display:inline-flex;align-items:center;gap:8px;background:var(--panel);
@@ -61,8 +53,6 @@
   .chip .sw{width:9px;height:9px;border-radius:50%;flex:none}
   .chip.on{border-color:var(--orange);background:rgba(236,139,60,.08)}
   .chip .cnt{color:var(--faint);font-family:var(--mono);font-size:11px}
-
-  /* ---- summary cards ---- */
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:22px}
   .card{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:16px 17px;position:relative;overflow:hidden}
   .card .accentbar{position:absolute;left:0;top:0;bottom:0;width:3px}
@@ -74,8 +64,6 @@
   .delta.up{color:var(--green);background:rgba(91,185,140,.12)}
   .delta.down{color:var(--red);background:rgba(201,106,94,.12)}
   .delta.flat{color:var(--muted);background:rgba(131,131,141,.12)}
-
-  /* ---- panels ---- */
   .panel{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;margin-bottom:22px}
   .phead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
   .phead .tick{width:4px;height:15px;border-radius:2px;background:var(--orange);flex:none}
@@ -83,28 +71,25 @@
   .phead .hint{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--faint)}
   .pbody{padding:16px}
   #chartBox{position:relative;height:340px}
-
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line-soft)}
   th:first-child,td:first-child{text-align:left}
   th{color:var(--faint);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
   tbody tr:hover{background:var(--raised)}
   tfoot td{border-top:2px solid var(--line);border-bottom:0;font-weight:700;color:var(--orange)}
-
   .empty{color:var(--muted);text-align:center;padding:42px 12px;font-size:13.5px}
   .empty .big{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:6px}
-
-  /* ---- modal ---- */
   .modal-back{position:fixed;inset:0;background:rgba(6,6,8,.72);display:none;align-items:flex-start;justify-content:center;padding:44px 16px;z-index:80;overflow:auto}
   .modal-back.show{display:flex}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:640px;padding:22px}
   .modal h2{margin:0 0 4px;font-size:17px}
   .modal .desc{color:var(--muted);font-size:12.5px;margin-bottom:16px;line-height:1.55}
-  .drivergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:6px;max-height:230px;overflow:auto;
+  .drivergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:230px;overflow:auto;
     background:var(--raised);border:1px solid var(--line);border-radius:9px;padding:10px}
   .dchk{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;padding:4px 6px;border-radius:6px;cursor:pointer}
   .dchk:hover{background:var(--line)}
   .dchk input{accent-color:var(--orange)}
+  .dchk.hide{display:none}
   .rangebar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
   .rangebar input{width:120px}
   .tpl-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line-soft);font-size:13px}
@@ -115,16 +100,12 @@
   .linkbtn:hover{color:var(--orange)}
   .linkbtn.danger:hover{color:var(--red)}
   .row-actions{display:flex;gap:14px;justify-content:flex-end;align-items:center;margin-top:18px}
-
-  /* ---- setup notice ---- */
   .setup{max-width:640px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px}
   .setup h2{margin:0 0 10px;font-size:18px}
   .setup p{color:var(--muted);font-size:13.5px;line-height:1.6}
   .setup code{background:var(--raised);padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:12.5px;color:var(--orange)}
-
   ::-webkit-scrollbar{height:9px;width:9px}
   ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
-
   @media (prefers-reduced-motion:no-preference){
     .card,.panel{animation:fade .28s ease both}
     @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -136,36 +117,37 @@
 
 <div id="nav-slot"></div>
 
-<!-- ==================== 未配置提示 ==================== -->
 <div id="setup" class="setup" style="display:none">
   <h2>还差一步：填入 Supabase 连接信息</h2>
   <p>打开本文件，找到顶部 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code> 两个常量，
   换成你自己项目的值（Supabase 控制台 → Project Settings → API），保存后刷新即可。</p>
 </div>
 
-<!-- ==================== 主界面 ==================== -->
 <div class="wrap" id="app" style="display:none">
   <header class="top">
     <div class="brand">
       <div class="kick">Night Dispatch</div>
-      <h1>路线数量统计</h1>
-      <div class="sub">选日期 → 选模板 → 看多条路线的加和与当日变化</div>
+      <h1>数量统计</h1>
+      <div class="sub">路线 / 仓库 · 选日期 → 选模板 → 看合并数量与当日变化</div>
     </div>
     <div class="conn"><span class="dot" id="connDot"></span><span id="connText">连接中…</span></div>
   </header>
 
   <div class="controls">
     <div class="fld">
-      <label>日期</label>
-      <input type="date" id="datePick" />
+      <label>数据源</label>
+      <div class="seg" id="sourceSeg">
+        <button data-s="route" class="active">路线</button>
+        <button data-s="warehouse">仓库</button>
+      </div>
     </div>
     <div class="fld">
       <label>指标</label>
-      <div class="seg" id="metricSeg">
-        <button data-m="order_count" class="active">总单量</button>
-        <button data-m="count_type0">类型0</button>
-        <button data-m="count_type1">类型1</button>
-      </div>
+      <div class="seg" id="metricSeg"></div>
+    </div>
+    <div class="fld">
+      <label>日期</label>
+      <input type="date" id="datePick" />
     </div>
     <div class="spacer"></div>
     <button class="btn" id="refreshBtn">刷新</button>
@@ -173,7 +155,6 @@
   </div>
 
   <div class="chips" id="seriesChips"></div>
-
   <div class="cards" id="summaryCards"></div>
 
   <div class="panel">
@@ -182,16 +163,15 @@
   </div>
 
   <div class="panel">
-    <div class="phead"><span class="tick"></span><h2>最新一次快照 · 分路线明细</h2><span class="hint" id="tableSub"></span></div>
+    <div class="phead"><span class="tick"></span><h2 id="tableTitle">最新一次快照 · 明细</h2><span class="hint" id="tableSub"></span></div>
     <div class="pbody"><div id="tableWrap"><div class="empty">选择上方的模板后显示明细。</div></div></div>
   </div>
 </div>
 
-<!-- ==================== 模板管理弹窗 ==================== -->
 <div class="modal-back" id="modalBack">
   <div class="modal">
     <h2 id="modalTitle">新建模板</h2>
-    <p class="desc">把一组路线(司机ID)存成模板，例如“1号车 · 路线1-10”。前端会把这些路线的数量加起来显示。</p>
+    <p class="desc" id="modalDesc"></p>
 
     <div class="fld" style="margin-bottom:12px">
       <label>模板名称</label>
@@ -210,11 +190,12 @@
       </select>
     </div>
 
-    <label style="font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:600">选择路线</label>
+    <label id="entityLabel" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:600">选择成员</label>
     <div class="rangebar">
-      <div class="fld"><label>从 ID</label><input type="number" id="rangeFrom" placeholder="181006"/></div>
-      <div class="fld"><label>到 ID</label><input type="number" id="rangeTo" placeholder="181015"/></div>
-      <button class="btn" id="rangeSelect">勾选此范围</button>
+      <div class="fld" style="flex:1;min-width:160px"><label>搜索</label><input type="text" id="entitySearch" placeholder="按名字或ID筛选…" style="width:100%"/></div>
+      <div class="fld" id="rangeBar" style="display:flex"><label>从 ID</label><input type="number" id="rangeFrom" placeholder="181006"/></div>
+      <div class="fld" id="rangeBar2" style="display:flex"><label>到 ID</label><input type="number" id="rangeTo" placeholder="181015"/></div>
+      <button class="btn" id="rangeSelect">勾选范围</button>
       <button class="btn ghost" id="selAll">全选</button>
       <button class="btn ghost" id="selNone">清空</button>
     </div>
@@ -231,83 +212,105 @@
 </div>
 
 <script>
+fetch("nav.html").then(r=>r.text()).then(html=>{ document.getElementById("nav-slot").innerHTML=html; });
+
 /* =====================================================================
-   1) Supabase 连接信息
-      SUPABASE_ANON_KEY 这里填【Publishable key】(sb_publishable_…)
-      —— 新版的 anon key，前端用，受 RLS 保护，公开安全。
-      在 Connect 弹窗或 Settings → API Keys 里复制。
+   Supabase 连接信息（SUPABASE_ANON_KEY 填 Publishable key sb_publishable_…）
    ===================================================================== */
-fetch("nav.html")
-  .then(r => r.text())
-  .then(html => { document.getElementById("nav-slot").innerHTML = html; });
 const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
 /* ===================================================================== */
 
 const PALETTE = ["#ec8b3c","#6f9fd8","#5bb98c","#c96a5e","#b98cd8","#d8b46f","#6fd8c4","#c98cae"];
 
+// 数据源定义：路线 vs 仓库
+const SOURCES = {
+  route:     { table:"snapshots",           idField:"driver_id",    kind:"route",
+               entityCol:"路线(司机ID)", tableTitle:"最新一次快照 · 分路线明细",
+               metrics:[{k:"order_count",label:"总单量"},{k:"count_type0",label:"类型0"},{k:"count_type1",label:"类型1"}] },
+  warehouse: { table:"warehouse_snapshots", idField:"warehouse_id", kind:"warehouse",
+               entityCol:"仓库", tableTitle:"最新一次快照 · 分仓库明细",
+               metrics:[{k:"qty",label:"货量"}] },
+};
+
 const state = {
-  sb:null, templates:[], selected:new Set(), metric:"order_count",
-  date:null, dayRows:[], byTs:new Map(), tsList:[], allDrivers:[], editingId:null, chart:null,
+  sb:null, source:"route", templates:[], selected:new Set(), metric:"order_count",
+  date:null, byTs:new Map(), tsList:[], allEntities:[], entityName:new Map(), editingId:null, chart:null,
 };
 const $ = s => document.querySelector(s);
+function src(){ return SOURCES[state.source]; }
 
-const TZ = "America/New_York";  // 所有时间固定按纽约时间显示/计算
-
+const TZ = "America/New_York";
 function fmtTime(iso){ return new Date(iso).toLocaleTimeString("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}); }
 function todayStr(){ return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
-// 某 UTC 瞬间在纽约的偏移(分钟，如 EDT=-240)
 function tzOffset(date){
   const p=new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
     .formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});
   return (Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)-date.getTime())/60000;
 }
-// 纽约某日 00:00 对应的 UTC 瞬间(毫秒)
-function nyMidnightUTC(y,m,d){
-  const guess=Date.UTC(y,m-1,d,0,0,0);
-  let off=tzOffset(new Date(guess)); let inst=guess-off*60000;
-  off=tzOffset(new Date(inst)); return guess-off*60000;
-}
+function nyMidnightUTC(y,m,d){ const g=Date.UTC(y,m-1,d,0,0,0); let o=tzOffset(new Date(g)); let i=g-o*60000; o=tzOffset(new Date(i)); return g-o*60000; }
 function localDayRange(dateStr){
   const [y,m,d]=dateStr.split("-").map(Number);
-  const start=nyMidnightUTC(y,m,d);
-  const nd=new Date(Date.UTC(y,m-1,d+1));
+  const start=nyMidnightUTC(y,m,d); const nd=new Date(Date.UTC(y,m-1,d+1));
   const end=nyMidnightUTC(nd.getUTCFullYear(),nd.getUTCMonth()+1,nd.getUTCDate());
   return { startISO:new Date(start).toISOString(), endISO:new Date(end).toISOString() };
 }
-function metricLabel(){ return {order_count:"总单量",count_type0:"类型0",count_type1:"类型1"}[state.metric]; }
+function metricLabel(){ return (src().metrics.find(m=>m.k===state.metric)||{}).label||""; }
+function currentTemplates(){ return state.templates.filter(t=>(t.kind||"route")===state.source); }
 
 function init(){
   if(SUPABASE_URL.includes("你的项目") || SUPABASE_ANON_KEY.includes("在此")){ $("#setup").style.display="block"; return; }
   $("#app").style.display="block";
   state.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   state.date = todayStr(); $("#datePick").value = state.date;
+  renderMetricSeg();
   bindEvents(); bootstrap();
 }
 async function bootstrap(){
-  try{ await loadDrivers(); await loadTemplates(); await loadDay(); setConn(true,"已连接"); }
+  try{ await loadTemplates(); await loadEntities(); await loadDay(); setConn(true,"已连接"); }
   catch(e){ console.error(e); setConn(false,"连接失败："+(e.message||e)); }
 }
 function setConn(ok,text){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=text; }
 
-async function loadDrivers(){
-  const { data, error } = await state.sb.from("snapshots").select("driver_id")
-    .order("captured_at",{ascending:false}).limit(400);
-  if(error) throw error;
-  state.allDrivers = [...new Set((data||[]).map(r=>r.driver_id))].sort((a,b)=>a-b);
+// 读取当前数据源"最近出现过的成员"，用于建模板时勾选
+async function loadEntities(){
+  const S=src();
+  if(state.source==="warehouse"){
+    const { data, error } = await state.sb.from(S.table).select("warehouse_id,warehouse_name")
+      .order("captured_at",{ascending:false}).limit(2000);
+    if(error) throw error;
+    const map=new Map();
+    (data||[]).forEach(r=>{ if(!map.has(r.warehouse_id)) map.set(r.warehouse_id, r.warehouse_name||String(r.warehouse_id)); });
+    state.entityName=map;
+    state.allEntities=[...map.entries()].map(([id,name])=>({id,name,label:`${name} (${id})`}))
+      .sort((a,b)=>a.name.localeCompare(b.name));
+  }else{
+    const { data, error } = await state.sb.from(S.table).select("driver_id")
+      .order("captured_at",{ascending:false}).limit(600);
+    if(error) throw error;
+    const ids=[...new Set((data||[]).map(r=>r.driver_id))].sort((a,b)=>a-b);
+    state.entityName=new Map(ids.map(id=>[id,String(id)]));
+    state.allEntities=ids.map(id=>({id,name:String(id),label:String(id)}));
+  }
 }
+
 async function loadTemplates(){
   const { data, error } = await state.sb.from("route_templates").select("*").order("created_at",{ascending:true});
   if(error) throw error;
   state.templates = data||[];
-  if(state.selected.size===0) state.templates.forEach(t=>state.selected.add(t.id));
+  ensureSelection();
   renderChips(); renderTplList();
 }
+function ensureSelection(){
+  const cur=currentTemplates();
+  if(!cur.some(t=>state.selected.has(t.id))) cur.forEach(t=>state.selected.add(t.id));
+}
+
 async function loadDay(){
-  const {startISO,endISO}=localDayRange(state.date);
+  const S=src(); const {startISO,endISO}=localDayRange(state.date);
   let all=[], from=0, page=1000;
   while(true){
-    const { data, error } = await state.sb.from("snapshots").select("*")
+    const { data, error } = await state.sb.from(S.table).select("*")
       .gte("captured_at",startISO).lt("captured_at",endISO)
       .order("captured_at",{ascending:true}).range(from,from+page-1);
     if(error) throw error;
@@ -315,38 +318,87 @@ async function loadDay(){
     if(!data || data.length<page) break;
     from+=page;
   }
-  state.dayRows=all;
   const byTs=new Map();
-  for(const r of all){ if(!byTs.has(r.captured_at)) byTs.set(r.captured_at,new Map()); byTs.get(r.captured_at).set(r.driver_id,r); }
+  for(const r of all){ if(!byTs.has(r.captured_at)) byTs.set(r.captured_at,new Map()); byTs.get(r.captured_at).set(r[S.idField],r); }
   state.byTs=byTs; state.tsList=[...byTs.keys()].sort();
   renderAll();
 }
-function seriesSumAt(ids,ts){ const m=state.byTs.get(ts); if(!m) return 0; let s=0; for(const id of ids){ const r=m.get(id); if(r) s+=(r[state.metric]||0); } return s; }
-function selectedSeries(){ return state.templates.filter(t=>state.selected.has(t.id)).map((t,i)=>({...t,color:t.color||PALETTE[i%PALETTE.length]})); }
 
-function renderAll(){ renderCards(); renderChart(); renderTable(); $("#chartSub").textContent=`${state.date} · ${metricLabel()} · 纽约时间`; }
+function seriesSumAt(ids,ts){ const m=state.byTs.get(ts); if(!m) return 0; let s=0; for(const id of ids){ const r=m.get(id); if(r) s+=(r[state.metric]||0); } return s; }
+
+// 画图/卡片用的系列：
+//  - 路线：一个模板 = 一条线(成员加和)
+//  - 仓库：选中模板里的每个仓库 = 各自一条线(不加和，跨模板去重)
+function plotSeries(){
+  const tpls=currentTemplates().filter(t=>state.selected.has(t.id));
+  if(state.source==="warehouse"){
+    const seen=new Map(); let i=0;
+    tpls.forEach(t=>(t.driver_ids||[]).forEach(id=>{
+      if(!seen.has(id)){ seen.set(id,{name:state.entityName.get(id)||String(id),ids:[id],color:PALETTE[i%PALETTE.length]}); i++; }
+    }));
+    return [...seen.values()];
+  }
+  return tpls.map((t,i)=>({name:t.name,ids:t.driver_ids||[],color:t.color||PALETTE[i%PALETTE.length]}));
+}
+// 明细表用的成员ID合集（选中模板的所有成员）
+function selectedMemberIds(){
+  const ids=new Set();
+  currentTemplates().filter(t=>state.selected.has(t.id)).forEach(t=>(t.driver_ids||[]).forEach(id=>ids.add(id)));
+  return ids;
+}
+
+function renderAll(){
+  renderCards(); renderChart(); renderTable();
+  $("#chartSub").textContent=`${state.date} · ${metricLabel()} · 纽约时间`;
+  $("#tableTitle").textContent=src().tableTitle;
+}
+
+function renderMetricSeg(){
+  const seg=$("#metricSeg"); const ms=src().metrics;
+  if(!ms.some(m=>m.k===state.metric)) state.metric=ms[0].k;
+  seg.innerHTML="";
+  ms.forEach(m=>{
+    const b=document.createElement("button"); b.dataset.m=m.k; b.textContent=m.label;
+    if(m.k===state.metric) b.classList.add("active");
+    b.onclick=()=>{ seg.querySelectorAll("button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); state.metric=m.k; renderAll(); };
+    seg.appendChild(b);
+  });
+}
+
+async function switchSource(s){
+  if(s===state.source) return;
+  state.source=s;
+  $("#sourceSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.s===s));
+  state.metric=src().metrics[0].k;
+  renderMetricSeg();
+  ensureSelection();
+  renderChips(); renderTplList();
+  setConn(true,"加载中…");
+  try{ await loadEntities(); await loadDay(); renderTplList(); setConn(true,"已连接"); }
+  catch(e){ setConn(false,"连接失败："+(e.message||e)); }
+}
 
 function renderChips(){
-  const box=$("#seriesChips");
-  if(state.templates.length===0){ box.innerHTML=`<span class="hint">还没有模板。点右上角“管理模板”创建第一个（例如把路线 181006–181015 存成“1号车”）。</span>`; return; }
+  const box=$("#seriesChips"); const cur=currentTemplates();
+  if(cur.length===0){ box.innerHTML=`<span class="hint">还没有${state.source==="warehouse"?"仓库":"路线"}模板。点右上角“管理模板”创建一个。</span>`; return; }
   box.innerHTML="";
-  const tag=document.createElement("span"); tag.className="hint"; tag.textContent="选择要查看的路线组（可多选）："; box.appendChild(tag);
-  state.templates.forEach((t,i)=>{
+  const tag=document.createElement("span"); tag.className="hint"; tag.textContent="选择要查看的组（可多选）："; box.appendChild(tag);
+  cur.forEach((t,i)=>{
     const on=state.selected.has(t.id);
     const el=document.createElement("div"); el.className="chip"+(on?" on":"");
-    el.innerHTML=`<span class="sw" style="background:${t.color||PALETTE[i%PALETTE.length]}"></span>${escapeHtml(t.name)} <span class="cnt">${(t.driver_ids||[]).length}条</span>`;
+    el.innerHTML=`<span class="sw" style="background:${t.color||PALETTE[i%PALETTE.length]}"></span>${escapeHtml(t.name)} <span class="cnt">${(t.driver_ids||[]).length}项</span>`;
     el.onclick=()=>{ on?state.selected.delete(t.id):state.selected.add(t.id); renderChips(); renderAll(); };
     box.appendChild(el);
   });
 }
 function renderCards(){
-  const box=$("#summaryCards"); const series=selectedSeries();
+  const box=$("#summaryCards"); const series=plotSeries();
   if(series.length===0){ box.innerHTML=""; return; }
   const ts=state.tsList, latest=ts[ts.length-1], prev=ts[ts.length-2];
   box.innerHTML="";
   series.forEach(s=>{
-    const cur=latest?seriesSumAt(s.driver_ids,latest):0;
-    const pre=prev?seriesSumAt(s.driver_ids,prev):null;
+    const cur=latest?seriesSumAt(s.ids,latest):0;
+    const pre=prev?seriesSumAt(s.ids,prev):null;
     let delta="",dcls="flat";
     if(pre!==null){ const d=cur-pre; dcls=d>0?"up":d<0?"down":"flat"; delta=(d>0?"▲ +":d<0?"▼ ":"± ")+Math.abs(d); }
     const card=document.createElement("div"); card.className="card";
@@ -359,9 +411,9 @@ function renderCards(){
   });
 }
 function renderChart(){
-  const series=selectedSeries();
+  const series=plotSeries();
   const labels=state.tsList.map(fmtTime);
-  const datasets=series.map(s=>({label:s.name,data:state.tsList.map(ts=>seriesSumAt(s.driver_ids,ts)),
+  const datasets=series.map(s=>({label:s.name,data:state.tsList.map(ts=>seriesSumAt(s.ids,ts)),
     borderColor:s.color,backgroundColor:s.color,tension:.25,pointRadius:2,pointHoverRadius:5,borderWidth:2}));
   const cfg={type:"line",data:{labels,datasets},options:{
     responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
@@ -371,53 +423,80 @@ function renderChart(){
       y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:true}}}};
   if(state.chart){ state.chart.data=cfg.data; state.chart.options=cfg.options; state.chart.update(); }
   else state.chart=new Chart($("#chart"),cfg);
-  if(state.tsList.length===0){ $("#chartBox").innerHTML=`<div class="empty"><div class="big">这一天暂无数据</div>确认抓取脚本在运行，并且日期选对了。</div>`; state.chart=null; }
+  if(state.tsList.length===0){ $("#chartBox").innerHTML=`<div class="empty"><div class="big">这一天暂无数据</div>确认抓取脚本在运行，并且日期/数据源选对了。</div>`; state.chart=null; }
 }
 function renderTable(){
-  const wrap=$("#tableWrap"); const series=selectedSeries(); const latest=state.tsList[state.tsList.length-1];
+  const wrap=$("#tableWrap"); const series=plotSeries(); const latest=state.tsList[state.tsList.length-1];
   if(series.length===0){ wrap.innerHTML=`<div class="empty">选择上方的模板后显示明细。</div>`; $("#tableSub").textContent=""; return; }
   if(!latest){ wrap.innerHTML=`<div class="empty">这一天暂无数据。</div>`; $("#tableSub").textContent=""; return; }
   $("#tableSub").textContent=fmtTime(latest);
-  const ids=new Set(); series.forEach(s=>(s.driver_ids||[]).forEach(id=>ids.add(id)));
+  const ids=selectedMemberIds();
   const m=state.byTs.get(latest); const rows=[...ids].sort((a,b)=>a-b);
-  let t0=0,t1=0,ta=0,body="";
-  for(const id of rows){ const r=m.get(id); const c0=r?r.count_type0:0,c1=r?r.count_type1:0,ca=r?r.order_count:0;
-    t0+=c0;t1+=c1;ta+=ca;
-    body+=`<tr><td class="num">${id}</td><td class="num">${ca}</td><td class="num">${c0}</td><td class="num">${c1}</td></tr>`; }
-  wrap.innerHTML=`<table><thead><tr><th>路线(司机ID)</th><th>总单量</th><th>类型0</th><th>类型1</th></tr></thead>
-    <tbody>${body}</tbody>
-    <tfoot><tr><td>合计 ${rows.length} 条</td><td class="num">${ta}</td><td class="num">${t0}</td><td class="num">${t1}</td></tr></tfoot></table>`;
+
+  if(state.source==="warehouse"){
+    let tq=0,body="";
+    // 按货量从大到小排，方便看
+    const sorted=rows.map(id=>({id,r:m.get(id)})).sort((a,b)=>((b.r?b.r.qty:0)-(a.r?a.r.qty:0)));
+    for(const {id,r} of sorted){ const q=r?r.qty:0; tq+=q;
+      body+=`<tr><td>${escapeHtml(state.entityName.get(id)||id)}</td><td class="num">${q}</td></tr>`; }
+    wrap.innerHTML=`<table><thead><tr><th>仓库</th><th>货量</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td>合计 ${rows.length} 个仓</td><td class="num">${tq}</td></tr></tfoot></table>`;
+  }else{
+    let t0=0,t1=0,ta=0,body="";
+    for(const id of rows){ const r=m.get(id); const c0=r?r.count_type0:0,c1=r?r.count_type1:0,ca=r?r.order_count:0;
+      t0+=c0;t1+=c1;ta+=ca;
+      body+=`<tr><td class="num">${id}</td><td class="num">${ca}</td><td class="num">${c0}</td><td class="num">${c1}</td></tr>`; }
+    wrap.innerHTML=`<table><thead><tr><th>路线(司机ID)</th><th>总单量</th><th>类型0</th><th>类型1</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr><td>合计 ${rows.length} 条</td><td class="num">${ta}</td><td class="num">${t0}</td><td class="num">${t1}</td></tr></tfoot></table>`;
+  }
 }
 
 function openModal(editId=null){
   state.editingId=editId;
-  $("#modalTitle").textContent=editId?"编辑模板":"新建模板";
+  const wh=state.source==="warehouse";
+  $("#modalTitle").textContent=editId?"编辑模板":(wh?"新建仓库模板":"新建路线模板");
+  $("#modalDesc").textContent=wh
+    ? "把一组仓库存成模板，例如“东部几个仓”。前端会把这些仓库的货量加起来显示。"
+    : "把一组路线(司机ID)存成模板，例如“1号车 · 路线1-10”。前端会把这些路线的数量加起来显示。";
+  $("#entityLabel").textContent=wh?"选择仓库":"选择路线";
+  $("#rangeBar").style.display=wh?"none":"flex";
+  $("#rangeBar2").style.display=wh?"none":"flex";
   const t=editId?state.templates.find(x=>x.id===editId):null;
   $("#tplName").value=t?t.name:"";
   $("#tplColor").value=(t&&t.color)?t.color:"#ec8b3c";
-  renderDriverGrid(t?new Set(t.driver_ids):new Set());
+  $("#entitySearch").value="";
+  renderEntityGrid(t?new Set(t.driver_ids):new Set());
   renderTplList();
   $("#modalBack").classList.add("show");
 }
 function closeModal(){ $("#modalBack").classList.remove("show"); state.editingId=null; }
-function renderDriverGrid(checked){
+function renderEntityGrid(checked){
   const grid=$("#driverGrid");
-  if(state.allDrivers.length===0){ grid.innerHTML=`<span style="color:var(--faint);font-size:12px">还没抓到任何司机ID。先让抓取脚本跑一轮，再来建模板。</span>`; return; }
+  if(state.allEntities.length===0){ grid.innerHTML=`<span style="color:var(--faint);font-size:12px">还没抓到任何${state.source==="warehouse"?"仓库":"路线"}数据。先让抓取脚本跑一轮再来建模板。</span>`; return; }
   grid.innerHTML="";
-  state.allDrivers.forEach(id=>{
-    const lab=document.createElement("label"); lab.className="dchk";
-    lab.innerHTML=`<input type="checkbox" value="${id}" ${checked.has(id)?"checked":""}/><span>${id}</span>`;
+  state.allEntities.forEach(e=>{
+    const lab=document.createElement("label"); lab.className="dchk"; lab.dataset.label=(e.label||"").toLowerCase();
+    lab.innerHTML=`<input type="checkbox" value="${e.id}" ${checked.has(e.id)?"checked":""}/><span>${escapeHtml(e.label)}</span>`;
     grid.appendChild(lab);
   });
 }
-function checkedDriverIds(){ return [...document.querySelectorAll("#driverGrid input:checked")].map(i=>Number(i.value)); }
+function filterGrid(){
+  const q=$("#entitySearch").value.trim().toLowerCase();
+  document.querySelectorAll("#driverGrid .dchk").forEach(el=>{
+    el.classList.toggle("hide", q && !el.dataset.label.includes(q));
+  });
+}
+function checkedEntityIds(){ return [...document.querySelectorAll("#driverGrid input:checked")].map(i=>Number(i.value)); }
 async function saveTemplate(){
-  const name=$("#tplName").value.trim(); const ids=checkedDriverIds(); const color=$("#tplColor").value;
+  const name=$("#tplName").value.trim(); const ids=checkedEntityIds(); const color=$("#tplColor").value;
   if(!name){ alert("给模板起个名字吧。"); return; }
-  if(ids.length===0){ alert("至少勾选一条路线。"); return; }
+  if(ids.length===0){ alert("至少勾选一项。"); return; }
+  const payload={name,driver_ids:ids,color,kind:src().kind};
   try{
-    if(state.editingId){ const {error}=await state.sb.from("route_templates").update({name,driver_ids:ids,color}).eq("id",state.editingId); if(error) throw error; }
-    else{ const {error}=await state.sb.from("route_templates").insert({name,driver_ids:ids,color}); if(error) throw error; }
+    if(state.editingId){ const {error}=await state.sb.from("route_templates").update(payload).eq("id",state.editingId); if(error) throw error; }
+    else{ const {error}=await state.sb.from("route_templates").insert(payload); if(error) throw error; }
     await loadTemplates(); renderAll(); closeModal();
   }catch(e){ alert("保存失败："+(e.message||e)); }
 }
@@ -428,15 +507,16 @@ async function deleteTemplate(id){
   }catch(e){ alert("删除失败："+(e.message||e)); }
 }
 function renderTplList(){
-  const box=$("#tplList");
-  if(state.templates.length===0){ box.innerHTML=`<div class="empty" style="padding:16px">还没有模板。</div>`; return; }
+  const box=$("#tplList"); const cur=currentTemplates();
+  if(cur.length===0){ box.innerHTML=`<div class="empty" style="padding:16px">还没有${state.source==="warehouse"?"仓库":"路线"}模板。</div>`; return; }
   box.innerHTML="";
-  state.templates.forEach((t,i)=>{
+  cur.forEach((t,i)=>{
     const ids=t.driver_ids||[];
+    const names=state.source==="warehouse" ? ids.map(id=>state.entityName.get(id)||id).join(", ") : ids.join(", ");
     const row=document.createElement("div"); row.className="tpl-row";
     row.innerHTML=`<span class="sw" style="background:${t.color||PALETTE[i%PALETTE.length]}"></span>
-      <div class="grow"><div>${escapeHtml(t.name)} <span style="color:var(--faint)">· ${ids.length}条</span></div>
-      <div class="ids">${ids.join(", ")}</div></div>
+      <div class="grow"><div>${escapeHtml(t.name)} <span style="color:var(--faint)">· ${ids.length}项</span></div>
+      <div class="ids">${escapeHtml(names)}</div></div>
       <button class="linkbtn" data-edit="${t.id}">编辑</button>
       <button class="linkbtn danger" data-del="${t.id}">删除</button>`;
     box.appendChild(row);
@@ -446,18 +526,16 @@ function renderTplList(){
 }
 
 function bindEvents(){
+  $("#sourceSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>switchSource(b.dataset.s));
   $("#datePick").onchange=e=>{ state.date=e.target.value; loadDay().catch(err=>setConn(false,err.message)); };
-  $("#refreshBtn").onclick=()=>{ loadDrivers().then(loadDay).catch(err=>setConn(false,err.message)); };
+  $("#refreshBtn").onclick=()=>{ loadEntities().then(loadDay).catch(err=>setConn(false,err.message)); };
   $("#manageBtn").onclick=()=>openModal(null);
-  $("#metricSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
-    $("#metricSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active"); state.metric=b.dataset.m; renderAll();
-  });
   $("#modalCancel").onclick=closeModal;
   $("#modalBack").onclick=e=>{ if(e.target.id==="modalBack") closeModal(); };
   $("#tplSave").onclick=saveTemplate;
-  $("#selAll").onclick=()=>document.querySelectorAll("#driverGrid input").forEach(i=>i.checked=true);
-  $("#selNone").onclick=()=>document.querySelectorAll("#driverGrid input").forEach(i=>i.checked=false);
+  $("#entitySearch").oninput=filterGrid;
+  $("#selAll").onclick=()=>document.querySelectorAll("#driverGrid .dchk:not(.hide) input").forEach(i=>i.checked=true);
+  $("#selNone").onclick=()=>document.querySelectorAll("#driverGrid .dchk:not(.hide) input").forEach(i=>i.checked=false);
   $("#rangeSelect").onclick=()=>{
     const a=Number($("#rangeFrom").value),b=Number($("#rangeTo").value); if(!a||!b) return;
     const lo=Math.min(a,b),hi=Math.max(a,b);
