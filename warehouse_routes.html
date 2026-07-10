@@ -144,19 +144,7 @@
 </style>
 </head>
 <body data-page="wh">
-<nav class="globalnav">
-  <div class="gn-inner">
-    <a class="gn-brand" href="index.html">
-      <span class="gn-badge">UNITRANS</span>
-      <span class="gn-sysname">Dispatch Suite</span>
-    </a>
-    <div class="gn-links">
-      <a href="index.html" data-nav="plan"><span class="dot"></span>今日路线计划</a>
-      <a href="warehouse_routes.html" data-nav="wh"><span class="dot"></span>仓库分配</a>
-      <a href="bol-dispatch-board.html" data-nav="bol"><span class="dot"></span>BOL 调度板</a>
-    </div>
-  </div>
-</nav>
+<div id="nav-slot"></div>
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -234,6 +222,9 @@
 
 <script>
 // ===== 状态 =====
+fetch("nav.html")
+  .then(r => r.text())
+  .then(html => { document.getElementById("nav-slot").innerHTML = html; });
 let ROUTES = [];           // [{route,count}]
 let WAREHOUSES = [];       // [{name,id,qty}]
 const assign = new Map();  // warehouseId -> [route, ...]
