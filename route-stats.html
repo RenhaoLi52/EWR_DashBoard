@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Night Dispatch · 路线数量统计</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  /* 配色令牌与导航栏在 shared.css 中统一定义 */
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 22px 70px}
+
+  /* ---- header ---- */
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap}
+  .brand{display:flex;flex-direction:column;gap:3px}
+  .brand .kick{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--orange);font-weight:600}
+  .brand h1{margin:0;font-size:25px;font-weight:700;letter-spacing:-.01em}
+  .brand .sub{color:var(--muted);font-size:13px}
+  .conn{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+  .dot.ok{background:var(--green)}
+  .dot.err{background:var(--red)}
+
+  /* ---- controls ---- */
+  .controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+  .fld{display:flex;flex-direction:column;gap:6px}
+  .fld label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  input[type=date],input[type=text],input[type=number],select{
+    background:var(--raised);border:1px solid var(--line);color:var(--ink);
+    border-radius:9px;padding:10px 12px;font-size:13.5px;font-family:var(--mono)}
+  input:focus,select:focus{outline:none;border-color:var(--orange)}
+  .seg{display:inline-flex;background:var(--raised);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{background:transparent;border:0;color:var(--muted);padding:10px 14px;font-size:13px;font-family:var(--sans)}
+  .seg button.active{background:var(--orange);color:#1a1205;font-weight:600}
+  .btn{border:1px solid var(--line);background:var(--raised);color:var(--ink);
+    padding:10px 15px;border-radius:9px;font-size:13px;font-weight:600;transition:.14s}
+  .btn:hover{border-color:var(--muted)}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a1205}
+  .btn.primary:hover{background:#f59a4d;border-color:#f59a4d}
+  .btn.ghost{background:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--ink)}
+  .spacer{flex:1 1 auto}
+
+  /* ---- series chips ---- */
+  .chips{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+  .chips .hint{color:var(--faint);font-size:12px}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line-soft);border-radius:999px;padding:7px 13px;cursor:pointer;font-size:13px;user-select:none;transition:.14s}
+  .chip:hover{border-color:var(--line)}
+  .chip .sw{width:9px;height:9px;border-radius:50%;flex:none}
+  .chip.on{border-color:var(--orange);background:rgba(236,139,60,.08)}
+  .chip .cnt{color:var(--faint);font-family:var(--mono);font-size:11px}
+
+  /* ---- summary cards ---- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:16px 17px;position:relative;overflow:hidden}
+  .card .accentbar{position:absolute;left:0;top:0;bottom:0;width:3px}
+  .card .name{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-bottom:11px}
+  .card .name .sw{width:9px;height:9px;border-radius:50%;flex:none}
+  .card .big{font-family:var(--mono);font-size:33px;font-weight:700;letter-spacing:-.01em;line-height:1}
+  .card .meta{margin-top:10px;display:flex;align-items:center;gap:9px;font-size:12px;color:var(--faint);font-family:var(--mono)}
+  .delta{font-family:var(--mono);font-size:12px;padding:2px 7px;border-radius:6px;font-weight:700}
+  .delta.up{color:var(--green);background:rgba(91,185,140,.12)}
+  .delta.down{color:var(--red);background:rgba(201,106,94,.12)}
+  .delta.flat{color:var(--muted);background:rgba(131,131,141,.12)}
+
+  /* ---- panels ---- */
+  .panel{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;margin-bottom:22px}
+  .phead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  .phead .tick{width:4px;height:15px;border-radius:2px;background:var(--orange);flex:none}
+  .phead h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.01em}
+  .phead .hint{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .pbody{padding:16px}
+  #chartBox{position:relative;height:340px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line-soft)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--faint);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+  tbody tr:hover{background:var(--raised)}
+  tfoot td{border-top:2px solid var(--line);border-bottom:0;font-weight:700;color:var(--orange)}
+
+  .empty{color:var(--muted);text-align:center;padding:42px 12px;font-size:13.5px}
+  .empty .big{font-family:var(--mono);font-size:13px;color:var(--muted);margin-bottom:6px}
+
+  /* ---- modal ---- */
+  .modal-back{position:fixed;inset:0;background:rgba(6,6,8,.72);display:none;align-items:flex-start;justify-content:center;padding:44px 16px;z-index:80;overflow:auto}
+  .modal-back.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:640px;padding:22px}
+  .modal h2{margin:0 0 4px;font-size:17px}
+  .modal .desc{color:var(--muted);font-size:12.5px;margin-bottom:16px;line-height:1.55}
+  .drivergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:6px;max-height:230px;overflow:auto;
+    background:var(--raised);border:1px solid var(--line);border-radius:9px;padding:10px}
+  .dchk{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;padding:4px 6px;border-radius:6px;cursor:pointer}
+  .dchk:hover{background:var(--line)}
+  .dchk input{accent-color:var(--orange)}
+  .rangebar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
+  .rangebar input{width:120px}
+  .tpl-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line-soft);font-size:13px}
+  .tpl-row .sw{width:10px;height:10px;border-radius:50%;flex:none}
+  .tpl-row .grow{flex:1;min-width:0}
+  .tpl-row .ids{color:var(--faint);font-family:var(--mono);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .linkbtn{background:none;border:0;color:var(--muted);cursor:pointer;font-size:12px;font-family:var(--sans);padding:4px 6px}
+  .linkbtn:hover{color:var(--orange)}
+  .linkbtn.danger:hover{color:var(--red)}
+  .row-actions{display:flex;gap:14px;justify-content:flex-end;align-items:center;margin-top:18px}
+
+  /* ---- setup notice ---- */
+  .setup{max-width:640px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px}
+  .setup h2{margin:0 0 10px;font-size:18px}
+  .setup p{color:var(--muted);font-size:13.5px;line-height:1.6}
+  .setup code{background:var(--raised);padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:12.5px;color:var(--orange)}
+
+  ::-webkit-scrollbar{height:9px;width:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+
+  @media (prefers-reduced-motion:no-preference){
+    .card,.panel{animation:fade .28s ease both}
+    @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  }
+  @media(max-width:560px){.card .big{font-size:27px}}
+</style>
+</head>
+<body data-page="stats">
+
+<nav class="globalnav">
+  <div class="gn-inner">
+    <a class="gn-brand" href="index.html">
+      <span class="gn-badge">UNITRANS</span>
+      <span class="gn-sysname">Dispatch Suite</span>
+    </a>
+    <div class="gn-links">
+      <a href="index.html" data-nav="plan"><span class="dot"></span>今日路线计划</a>
+      <a href="warehouse_routes.html" data-nav="wh"><span class="dot"></span>仓库分配</a>
+      <a href="bol-dispatch-board.html" data-nav="bol"><span class="dot"></span>BOL 调度板</a>
+      <a href="route-stats.html" data-nav="stats"><span class="dot"></span>路线数量统计</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ==================== 未配置提示 ==================== -->
+<div id="setup" class="setup" style="display:none">
+  <h2>还差一步：填入 Supabase 连接信息</h2>
+  <p>打开本文件，找到顶部 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code> 两个常量，
+  换成你自己项目的值（Supabase 控制台 → Project Settings → API），保存后刷新即可。</p>
+</div>
+
+<!-- ==================== 主界面 ==================== -->
+<div class="wrap" id="app" style="display:none">
+  <header class="top">
+    <div class="brand">
+      <div class="kick">Night Dispatch</div>
+      <h1>路线数量统计</h1>
+      <div class="sub">选日期 → 选模板 → 看多条路线的加和与当日变化</div>
+    </div>
+    <div class="conn"><span class="dot" id="connDot"></span><span id="connText">连接中…</span></div>
+  </header>
+
+  <div class="controls">
+    <div class="fld">
+      <label>日期</label>
+      <input type="date" id="datePick" />
+    </div>
+    <div class="fld">
+      <label>指标</label>
+      <div class="seg" id="metricSeg">
+        <button data-m="order_count" class="active">总单量</button>
+        <button data-m="count_type0">类型0</button>
+        <button data-m="count_type1">类型1</button>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="refreshBtn">刷新</button>
+    <button class="btn primary" id="manageBtn">管理模板</button>
+  </div>
+
+  <div class="chips" id="seriesChips"></div>
+
+  <div class="cards" id="summaryCards"></div>
+
+  <div class="panel">
+    <div class="phead"><span class="tick"></span><h2>当日变化</h2><span class="hint" id="chartSub"></span></div>
+    <div class="pbody"><div id="chartBox"><canvas id="chart"></canvas></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="tick"></span><h2>最新一次快照 · 分路线明细</h2><span class="hint" id="tableSub"></span></div>
+    <div class="pbody"><div id="tableWrap"><div class="empty">选择上方的模板后显示明细。</div></div></div>
+  </div>
+</div>
+
+<!-- ==================== 模板管理弹窗 ==================== -->
+<div class="modal-back" id="modalBack">
+  <div class="modal">
+    <h2 id="modalTitle">新建模板</h2>
+    <p class="desc">把一组路线(司机ID)存成模板，例如“1号车 · 路线1-10”。前端会把这些路线的数量加起来显示。</p>
+
+    <div class="fld" style="margin-bottom:12px">
+      <label>模板名称</label>
+      <input type="text" id="tplName" placeholder="例如：1号车 · 路线1-10" />
+    </div>
+    <div class="fld" style="margin-bottom:6px">
+      <label>颜色</label>
+      <select id="tplColor">
+        <option value="#ec8b3c">琥珀橙</option>
+        <option value="#6f9fd8">蓝</option>
+        <option value="#5bb98c">绿</option>
+        <option value="#c96a5e">红</option>
+        <option value="#b98cd8">紫</option>
+        <option value="#d8b46f">茶</option>
+        <option value="#6fd8c4">青</option>
+      </select>
+    </div>
+
+    <label style="font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:600">选择路线</label>
+    <div class="rangebar">
+      <div class="fld"><label>从 ID</label><input type="number" id="rangeFrom" placeholder="181006"/></div>
+      <div class="fld"><label>到 ID</label><input type="number" id="rangeTo" placeholder="181015"/></div>
+      <button class="btn" id="rangeSelect">勾选此范围</button>
+      <button class="btn ghost" id="selAll">全选</button>
+      <button class="btn ghost" id="selNone">清空</button>
+    </div>
+    <div class="drivergrid" id="driverGrid"></div>
+
+    <div class="row-actions">
+      <button class="linkbtn" id="modalCancel">关闭</button>
+      <button class="btn primary" id="tplSave">保存模板</button>
+    </div>
+
+    <h2 style="font-size:13px;margin:22px 0 4px;color:var(--muted);font-weight:600">已有模板</h2>
+    <div id="tplList"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   1) Supabase 连接信息
+      SUPABASE_ANON_KEY 这里填【Publishable key】(sb_publishable_…)
+      —— 新版的 anon key，前端用，受 RLS 保护，公开安全。
+      在 Connect 弹窗或 Settings → API Keys 里复制。
+   ===================================================================== */
+const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
+const SUPABASE_ANON_KEY = "在此粘贴 sb_publishable_… key";
+/* ===================================================================== */
+
+const PALETTE = ["#ec8b3c","#6f9fd8","#5bb98c","#c96a5e","#b98cd8","#d8b46f","#6fd8c4","#c98cae"];
+
+const state = {
+  sb:null, templates:[], selected:new Set(), metric:"order_count",
+  date:null, dayRows:[], byTs:new Map(), tsList:[], allDrivers:[], editingId:null, chart:null,
+};
+const $ = s => document.querySelector(s);
+
+const TZ = "America/New_York";  // 所有时间固定按纽约时间显示/计算
+
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}); }
+function todayStr(){ return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
+// 某 UTC 瞬间在纽约的偏移(分钟，如 EDT=-240)
+function tzOffset(date){
+  const p=new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
+    .formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});
+  return (Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)-date.getTime())/60000;
+}
+// 纽约某日 00:00 对应的 UTC 瞬间(毫秒)
+function nyMidnightUTC(y,m,d){
+  const guess=Date.UTC(y,m-1,d,0,0,0);
+  let off=tzOffset(new Date(guess)); let inst=guess-off*60000;
+  off=tzOffset(new Date(inst)); return guess-off*60000;
+}
+function localDayRange(dateStr){
+  const [y,m,d]=dateStr.split("-").map(Number);
+  const start=nyMidnightUTC(y,m,d);
+  const nd=new Date(Date.UTC(y,m-1,d+1));
+  const end=nyMidnightUTC(nd.getUTCFullYear(),nd.getUTCMonth()+1,nd.getUTCDate());
+  return { startISO:new Date(start).toISOString(), endISO:new Date(end).toISOString() };
+}
+function metricLabel(){ return {order_count:"总单量",count_type0:"类型0",count_type1:"类型1"}[state.metric]; }
+
+function init(){
+  if(SUPABASE_URL.includes("你的项目") || SUPABASE_ANON_KEY.includes("在此")){ $("#setup").style.display="block"; return; }
+  $("#app").style.display="block";
+  state.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  state.date = todayStr(); $("#datePick").value = state.date;
+  bindEvents(); bootstrap();
+}
+async function bootstrap(){
+  try{ await loadDrivers(); await loadTemplates(); await loadDay(); setConn(true,"已连接"); }
+  catch(e){ console.error(e); setConn(false,"连接失败："+(e.message||e)); }
+}
+function setConn(ok,text){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=text; }
+
+async function loadDrivers(){
+  const { data, error } = await state.sb.from("snapshots").select("driver_id")
+    .order("captured_at",{ascending:false}).limit(400);
+  if(error) throw error;
+  state.allDrivers = [...new Set((data||[]).map(r=>r.driver_id))].sort((a,b)=>a-b);
+}
+async function loadTemplates(){
+  const { data, error } = await state.sb.from("route_templates").select("*").order("created_at",{ascending:true});
+  if(error) throw error;
+  state.templates = data||[];
+  if(state.selected.size===0) state.templates.forEach(t=>state.selected.add(t.id));
+  renderChips(); renderTplList();
+}
+async function loadDay(){
+  const {startISO,endISO}=localDayRange(state.date);
+  let all=[], from=0, page=1000;
+  while(true){
+    const { data, error } = await state.sb.from("snapshots").select("*")
+      .gte("captured_at",startISO).lt("captured_at",endISO)
+      .order("captured_at",{ascending:true}).range(from,from+page-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data || data.length<page) break;
+    from+=page;
+  }
+  state.dayRows=all;
+  const byTs=new Map();
+  for(const r of all){ if(!byTs.has(r.captured_at)) byTs.set(r.captured_at,new Map()); byTs.get(r.captured_at).set(r.driver_id,r); }
+  state.byTs=byTs; state.tsList=[...byTs.keys()].sort();
+  renderAll();
+}
+function seriesSumAt(ids,ts){ const m=state.byTs.get(ts); if(!m) return 0; let s=0; for(const id of ids){ const r=m.get(id); if(r) s+=(r[state.metric]||0); } return s; }
+function selectedSeries(){ return state.templates.filter(t=>state.selected.has(t.id)).map((t,i)=>({...t,color:t.color||PALETTE[i%PALETTE.length]})); }
+
+function renderAll(){ renderCards(); renderChart(); renderTable(); $("#chartSub").textContent=`${state.date} · ${metricLabel()} · 纽约时间`; }
+
+function renderChips(){
+  const box=$("#seriesChips");
+  if(state.templates.length===0){ box.innerHTML=`<span class="hint">还没有模板。点右上角“管理模板”创建第一个（例如把路线 181006–181015 存成“1号车”）。</span>`; return; }
+  box.innerHTML="";
+  const tag=document.createElement("span"); tag.className="hint"; tag.textContent="选择要查看的路线组（可多选）："; box.appendChild(tag);
+  state.templates.forEach((t,i)=>{
+    const on=state.selected.has(t.id);
+    const el=document.createElement("div"); el.className="chip"+(on?" on":"");
+    el.innerHTML=`<span class="sw" style="background:${t.color||PALETTE[i%PALETTE.length]}"></span>${escapeHtml(t.name)} <span class="cnt">${(t.driver_ids||[]).length}条</span>`;
+    el.onclick=()=>{ on?state.selected.delete(t.id):state.selected.add(t.id); renderChips(); renderAll(); };
+    box.appendChild(el);
+  });
+}
+function renderCards(){
+  const box=$("#summaryCards"); const series=selectedSeries();
+  if(series.length===0){ box.innerHTML=""; return; }
+  const ts=state.tsList, latest=ts[ts.length-1], prev=ts[ts.length-2];
+  box.innerHTML="";
+  series.forEach(s=>{
+    const cur=latest?seriesSumAt(s.driver_ids,latest):0;
+    const pre=prev?seriesSumAt(s.driver_ids,prev):null;
+    let delta="",dcls="flat";
+    if(pre!==null){ const d=cur-pre; dcls=d>0?"up":d<0?"down":"flat"; delta=(d>0?"▲ +":d<0?"▼ ":"± ")+Math.abs(d); }
+    const card=document.createElement("div"); card.className="card";
+    card.innerHTML=`<div class="accentbar" style="background:${s.color}"></div>
+      <div class="name"><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.name)}</div>
+      <div class="big">${cur.toLocaleString()}</div>
+      <div class="meta">${pre!==null?`<span class="delta ${dcls}">${delta}</span><span>较上次</span>`:`<span>暂无上一次</span>`}
+      ${latest?`<span style="margin-left:auto">${fmtTime(latest)}</span>`:""}</div>`;
+    box.appendChild(card);
+  });
+}
+function renderChart(){
+  const series=selectedSeries();
+  const labels=state.tsList.map(fmtTime);
+  const datasets=series.map(s=>({label:s.name,data:state.tsList.map(ts=>seriesSumAt(s.driver_ids,ts)),
+    borderColor:s.color,backgroundColor:s.color,tension:.25,pointRadius:2,pointHoverRadius:5,borderWidth:2}));
+  const cfg={type:"line",data:{labels,datasets},options:{
+    responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{labels:{color:"#83838d",font:{family:"Space Grotesk"}}},
+      tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3"}},
+    scales:{x:{ticks:{color:"#5b5b64",maxRotation:0,autoSkip:true,maxTicksLimit:12,font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"}},
+      y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:true}}}};
+  if(state.chart){ state.chart.data=cfg.data; state.chart.options=cfg.options; state.chart.update(); }
+  else state.chart=new Chart($("#chart"),cfg);
+  if(state.tsList.length===0){ $("#chartBox").innerHTML=`<div class="empty"><div class="big">这一天暂无数据</div>确认抓取脚本在运行，并且日期选对了。</div>`; state.chart=null; }
+}
+function renderTable(){
+  const wrap=$("#tableWrap"); const series=selectedSeries(); const latest=state.tsList[state.tsList.length-1];
+  if(series.length===0){ wrap.innerHTML=`<div class="empty">选择上方的模板后显示明细。</div>`; $("#tableSub").textContent=""; return; }
+  if(!latest){ wrap.innerHTML=`<div class="empty">这一天暂无数据。</div>`; $("#tableSub").textContent=""; return; }
+  $("#tableSub").textContent=fmtTime(latest);
+  const ids=new Set(); series.forEach(s=>(s.driver_ids||[]).forEach(id=>ids.add(id)));
+  const m=state.byTs.get(latest); const rows=[...ids].sort((a,b)=>a-b);
+  let t0=0,t1=0,ta=0,body="";
+  for(const id of rows){ const r=m.get(id); const c0=r?r.count_type0:0,c1=r?r.count_type1:0,ca=r?r.order_count:0;
+    t0+=c0;t1+=c1;ta+=ca;
+    body+=`<tr><td class="num">${id}</td><td class="num">${ca}</td><td class="num">${c0}</td><td class="num">${c1}</td></tr>`; }
+  wrap.innerHTML=`<table><thead><tr><th>路线(司机ID)</th><th>总单量</th><th>类型0</th><th>类型1</th></tr></thead>
+    <tbody>${body}</tbody>
+    <tfoot><tr><td>合计 ${rows.length} 条</td><td class="num">${ta}</td><td class="num">${t0}</td><td class="num">${t1}</td></tr></tfoot></table>`;
+}
+
+function openModal(editId=null){
+  state.editingId=editId;
+  $("#modalTitle").textContent=editId?"编辑模板":"新建模板";
+  const t=editId?state.templates.find(x=>x.id===editId):null;
+  $("#tplName").value=t?t.name:"";
+  $("#tplColor").value=(t&&t.color)?t.color:"#ec8b3c";
+  renderDriverGrid(t?new Set(t.driver_ids):new Set());
+  renderTplList();
+  $("#modalBack").classList.add("show");
+}
+function closeModal(){ $("#modalBack").classList.remove("show"); state.editingId=null; }
+function renderDriverGrid(checked){
+  const grid=$("#driverGrid");
+  if(state.allDrivers.length===0){ grid.innerHTML=`<span style="color:var(--faint);font-size:12px">还没抓到任何司机ID。先让抓取脚本跑一轮，再来建模板。</span>`; return; }
+  grid.innerHTML="";
+  state.allDrivers.forEach(id=>{
+    const lab=document.createElement("label"); lab.className="dchk";
+    lab.innerHTML=`<input type="checkbox" value="${id}" ${checked.has(id)?"checked":""}/><span>${id}</span>`;
+    grid.appendChild(lab);
+  });
+}
+function checkedDriverIds(){ return [...document.querySelectorAll("#driverGrid input:checked")].map(i=>Number(i.value)); }
+async function saveTemplate(){
+  const name=$("#tplName").value.trim(); const ids=checkedDriverIds(); const color=$("#tplColor").value;
+  if(!name){ alert("给模板起个名字吧。"); return; }
+  if(ids.length===0){ alert("至少勾选一条路线。"); return; }
+  try{
+    if(state.editingId){ const {error}=await state.sb.from("route_templates").update({name,driver_ids:ids,color}).eq("id",state.editingId); if(error) throw error; }
+    else{ const {error}=await state.sb.from("route_templates").insert({name,driver_ids:ids,color}); if(error) throw error; }
+    await loadTemplates(); renderAll(); closeModal();
+  }catch(e){ alert("保存失败："+(e.message||e)); }
+}
+async function deleteTemplate(id){
+  if(!confirm("删除这个模板？")) return;
+  try{ const {error}=await state.sb.from("route_templates").delete().eq("id",id); if(error) throw error;
+    state.selected.delete(id); await loadTemplates(); renderAll();
+  }catch(e){ alert("删除失败："+(e.message||e)); }
+}
+function renderTplList(){
+  const box=$("#tplList");
+  if(state.templates.length===0){ box.innerHTML=`<div class="empty" style="padding:16px">还没有模板。</div>`; return; }
+  box.innerHTML="";
+  state.templates.forEach((t,i)=>{
+    const ids=t.driver_ids||[];
+    const row=document.createElement("div"); row.className="tpl-row";
+    row.innerHTML=`<span class="sw" style="background:${t.color||PALETTE[i%PALETTE.length]}"></span>
+      <div class="grow"><div>${escapeHtml(t.name)} <span style="color:var(--faint)">· ${ids.length}条</span></div>
+      <div class="ids">${ids.join(", ")}</div></div>
+      <button class="linkbtn" data-edit="${t.id}">编辑</button>
+      <button class="linkbtn danger" data-del="${t.id}">删除</button>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openModal(Number(b.dataset.edit)));
+  box.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>deleteTemplate(Number(b.dataset.del)));
+}
+
+function bindEvents(){
+  $("#datePick").onchange=e=>{ state.date=e.target.value; loadDay().catch(err=>setConn(false,err.message)); };
+  $("#refreshBtn").onclick=()=>{ loadDrivers().then(loadDay).catch(err=>setConn(false,err.message)); };
+  $("#manageBtn").onclick=()=>openModal(null);
+  $("#metricSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    $("#metricSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); state.metric=b.dataset.m; renderAll();
+  });
+  $("#modalCancel").onclick=closeModal;
+  $("#modalBack").onclick=e=>{ if(e.target.id==="modalBack") closeModal(); };
+  $("#tplSave").onclick=saveTemplate;
+  $("#selAll").onclick=()=>document.querySelectorAll("#driverGrid input").forEach(i=>i.checked=true);
+  $("#selNone").onclick=()=>document.querySelectorAll("#driverGrid input").forEach(i=>i.checked=false);
+  $("#rangeSelect").onclick=()=>{
+    const a=Number($("#rangeFrom").value),b=Number($("#rangeTo").value); if(!a||!b) return;
+    const lo=Math.min(a,b),hi=Math.max(a,b);
+    document.querySelectorAll("#driverGrid input").forEach(i=>{ const v=Number(i.value); if(v>=lo&&v<=hi) i.checked=true; });
+  };
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+init();
+</script>
+</body>
+</html>
