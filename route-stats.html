@@ -134,20 +134,7 @@
 </head>
 <body data-page="stats">
 
-<nav class="globalnav">
-  <div class="gn-inner">
-    <a class="gn-brand" href="index.html">
-      <span class="gn-badge">UNITRANS</span>
-      <span class="gn-sysname">Dispatch Suite</span>
-    </a>
-    <div class="gn-links">
-      <a href="index.html" data-nav="plan"><span class="dot"></span>今日路线计划</a>
-      <a href="warehouse_routes.html" data-nav="wh"><span class="dot"></span>仓库分配</a>
-      <a href="bol-dispatch-board.html" data-nav="bol"><span class="dot"></span>BOL 调度板</a>
-      <a href="route-stats.html" data-nav="stats"><span class="dot"></span>路线数量统计</a>
-    </div>
-  </div>
-</nav>
+<div id="nav-slot"></div>
 
 <!-- ==================== 未配置提示 ==================== -->
 <div id="setup" class="setup" style="display:none">
@@ -250,6 +237,9 @@
       —— 新版的 anon key，前端用，受 RLS 保护，公开安全。
       在 Connect 弹窗或 Settings → API Keys 里复制。
    ===================================================================== */
+fetch("nav.html")
+  .then(r => r.text())
+  .then(html => { document.getElementById("nav-slot").innerHTML = html; });
 const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
 /* ===================================================================== */
