@@ -81,15 +81,21 @@
 body[data-page="plan"]  .gn-links a[data-nav="plan"],
 body[data-page="wh"]    .gn-links a[data-nav="wh"],
 body[data-page="bol"]   .gn-links a[data-nav="bol"],
-body[data-page="stats"] .gn-links a[data-nav="stats"]{color:var(--ink);font-weight:600}
+body[data-page="stats"] .gn-links a[data-nav="stats"],
+body[data-page="forecast"] .gn-links a[data-nav="forecast"],
+body[data-page="batch"] .gn-links a[data-nav="batch"]{color:var(--ink);font-weight:600}
 body[data-page="plan"]  .gn-links a[data-nav="plan"] .dot,
 body[data-page="wh"]    .gn-links a[data-nav="wh"] .dot,
 body[data-page="bol"]   .gn-links a[data-nav="bol"] .dot,
-body[data-page="stats"] .gn-links a[data-nav="stats"] .dot{background:var(--orange)}
+body[data-page="stats"] .gn-links a[data-nav="stats"] .dot,
+body[data-page="forecast"] .gn-links a[data-nav="forecast"] .dot,
+body[data-page="batch"] .gn-links a[data-nav="batch"] .dot{background:var(--orange)}
 body[data-page="plan"]  .gn-links a[data-nav="plan"]::after,
 body[data-page="wh"]    .gn-links a[data-nav="wh"]::after,
 body[data-page="bol"]   .gn-links a[data-nav="bol"]::after,
-body[data-page="stats"] .gn-links a[data-nav="stats"]::after{background:var(--orange)}
+body[data-page="stats"] .gn-links a[data-nav="stats"]::after,
+body[data-page="forecast"] .gn-links a[data-nav="forecast"]::after,
+body[data-page="batch"] .gn-links a[data-nav="batch"]::after{background:var(--orange)}
 
 @media(max-width:480px){
   .gn-inner{gap:10px;padding:0 12px}
