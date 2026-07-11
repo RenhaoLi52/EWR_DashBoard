@@ -114,10 +114,10 @@
   }
   @media(max-width:560px){.card .big{font-size:27px}}
 </style>
+<script src="nav.js" defer></script>
 </head>
-<body data-page="stats">
+<body>
 
-<div id="nav-slot"></div>
 
 <div id="setup" class="setup" style="display:none">
   <h2>还差一步：填入 Supabase 连接信息</h2>
@@ -222,8 +222,6 @@
 </div>
 
 <script>
-fetch("nav.html").then(r=>r.text()).then(html=>{ document.getElementById("nav-slot").innerHTML=html; });
-
 /* =====================================================================
    Supabase 连接信息（SUPABASE_ANON_KEY 填 Publishable key sb_publishable_…）
    ===================================================================== */
