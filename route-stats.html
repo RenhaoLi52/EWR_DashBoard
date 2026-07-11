@@ -235,10 +235,10 @@ const PALETTE = ["#ec8b3c","#6f9fd8","#5bb98c","#c96a5e","#b98cd8","#d8b46f","#6
 
 // 数据源定义：路线 vs 仓库
 const SOURCES = {
-  route:     { table:"snapshots",           idField:"driver_id",    kind:"route", batchField:"batch_list",
+  route:     { table:"snapshots",           idField:"driver_id",    kind:"route", batchField:"batch_list", batchView:"route_batches",
                entityCol:"路线(司机ID)", tableTitle:"最新一次快照 · 分路线明细",
                metrics:[{k:"order_count",label:"总单量"},{k:"count_type0",label:"类型0"},{k:"count_type1",label:"类型1"}] },
-  warehouse: { table:"warehouse_snapshots", idField:"warehouse_id", kind:"warehouse", batchField:"batch_no",
+  warehouse: { table:"warehouse_snapshots", idField:"warehouse_id", kind:"warehouse", batchField:"batch_no", batchView:"warehouse_batches",
                entityCol:"仓库", tableTitle:"最新一次快照 · 分仓库明细",
                metrics:[{k:"qty",label:"货量"}] },
 };
@@ -302,13 +302,13 @@ function batchLabel(batch){
   return d ? `${d} 备货 · ${batch}` : batch;
 }
 
-// 批次下拉：数据表里出现过的单号
+// 批次下拉：读去重视图，拿到全部历史单号（不是只看最近几千行）
 async function loadBatches(){
   const S=src();
-  const seen=await state.sb.from(S.table).select(S.batchField)
-    .order("captured_at",{ascending:false}).limit(4000);
-  const arr=[...new Set((seen.data||[]).map(r=>r[S.batchField]).filter(Boolean))]
-    .sort((a,b)=>b.localeCompare(a));          // 单号自带日期，倒序即最新在前
+  const { data, error } = await state.sb.from(S.batchView)
+    .select("batch,last_seen").order("last_seen",{ascending:false}).limit(500);
+  if(error) throw error;
+  const arr=(data||[]).map(r=>r.batch).filter(Boolean);
   state.batches=arr;
   if(!state.batch || !arr.includes(state.batch)) state.batch=arr[0]||null;
   const sel=$("#batchSelect"); sel.innerHTML="";
@@ -347,23 +347,21 @@ function tsLabels(list){
     const lab = (prev && dk!==prev) ? `${nyDateShort(ts)} ${t}` : t; prev=dk; return lab; });
 }
 
-// 读取当前数据源"最近出现过的成员"，用于建模板时勾选
+// 读取所有出现过的成员（读去重视图，不会漏）
 async function loadEntities(){
-  const S=src();
   if(state.source==="warehouse"){
-    const { data, error } = await state.sb.from(S.table).select("warehouse_id,warehouse_name")
-      .order("captured_at",{ascending:false}).limit(2000);
+    const { data, error } = await state.sb.from("warehouse_list")
+      .select("warehouse_id,warehouse_name").limit(500);
     if(error) throw error;
     const map=new Map();
-    (data||[]).forEach(r=>{ if(!map.has(r.warehouse_id)) map.set(r.warehouse_id, r.warehouse_name||String(r.warehouse_id)); });
+    (data||[]).forEach(r=>map.set(r.warehouse_id, r.warehouse_name||String(r.warehouse_id)));
     state.entityName=map;
     state.allEntities=[...map.entries()].map(([id,name])=>({id,name,label:`${name} (${id})`}))
       .sort((a,b)=>a.name.localeCompare(b.name));
   }else{
-    const { data, error } = await state.sb.from(S.table).select("driver_id")
-      .order("captured_at",{ascending:false}).limit(600);
+    const { data, error } = await state.sb.from("route_drivers").select("driver_id").limit(1000);
     if(error) throw error;
-    const ids=[...new Set((data||[]).map(r=>r.driver_id))].sort((a,b)=>a-b);
+    const ids=(data||[]).map(r=>r.driver_id).sort((a,b)=>a-b);
     state.entityName=new Map(ids.map(id=>[id,String(id)]));
     state.allEntities=ids.map(id=>({id,name:String(id),label:String(id)}));
   }
