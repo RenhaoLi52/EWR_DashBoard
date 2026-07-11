@@ -178,10 +178,10 @@ function init(){
 function setConn(ok,t){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=t; }
 
 async function loadWarehouses(){
-  const { data, error } = await sb.from("warehouse_snapshots").select("warehouse_id,warehouse_name")
-    .order("captured_at",{ascending:false}).limit(3000);
+  const { data, error } = await sb.from("warehouse_list")
+    .select("warehouse_id,warehouse_name").limit(500);
   if(error) throw error;
-  const map=new Map(); (data||[]).forEach(r=>{ if(!map.has(r.warehouse_id)) map.set(r.warehouse_id,r.warehouse_name||String(r.warehouse_id)); });
+  const map=new Map(); (data||[]).forEach(r=>map.set(r.warehouse_id, r.warehouse_name||String(r.warehouse_id)));
   const arr=[...map.entries()].map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
   const sel=$("#whSelect"); sel.innerHTML="";
   arr.forEach(w=>{ const o=document.createElement("option"); o.value=w.id; o.textContent=`${w.name} (${w.id})`; sel.appendChild(o); });
