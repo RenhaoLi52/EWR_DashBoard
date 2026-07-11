@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="shared.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
@@ -128,7 +130,7 @@
     <div class="brand">
       <div class="kick">Night Dispatch</div>
       <h1>数量统计</h1>
-      <div class="sub">路线 / 仓库 · 选日期 → 选模板 → 看合并数量与当日变化</div>
+      <div class="sub">路线 / 仓库 · 选批次(单号) → 选模板 → 看当日变化（可缩放/拖动、切粒度）</div>
     </div>
     <div class="conn"><span class="dot" id="connDot"></span><span id="connText">连接中…</span></div>
   </header>
@@ -142,14 +144,22 @@
       </div>
     </div>
     <div class="fld">
+      <label>批次（单号）</label>
+      <select id="batchSelect" style="min-width:230px"></select>
+    </div>
+    <div class="fld">
       <label>指标</label>
       <div class="seg" id="metricSeg"></div>
     </div>
     <div class="fld">
-      <label>日期</label>
-      <input type="date" id="datePick" />
+      <label>粒度</label>
+      <div class="seg" id="granSeg">
+        <button data-g="20m" class="active">20分钟</button>
+        <button data-g="1h">1小时</button>
+      </div>
     </div>
     <div class="spacer"></div>
+    <button class="btn" id="resetZoom">重置缩放</button>
     <button class="btn" id="refreshBtn">刷新</button>
     <button class="btn primary" id="manageBtn">管理模板</button>
   </div>
@@ -225,17 +235,18 @@ const PALETTE = ["#ec8b3c","#6f9fd8","#5bb98c","#c96a5e","#b98cd8","#d8b46f","#6
 
 // 数据源定义：路线 vs 仓库
 const SOURCES = {
-  route:     { table:"snapshots",           idField:"driver_id",    kind:"route",
+  route:     { table:"snapshots",           idField:"driver_id",    kind:"route", batchField:"batch_list",
                entityCol:"路线(司机ID)", tableTitle:"最新一次快照 · 分路线明细",
                metrics:[{k:"order_count",label:"总单量"},{k:"count_type0",label:"类型0"},{k:"count_type1",label:"类型1"}] },
-  warehouse: { table:"warehouse_snapshots", idField:"warehouse_id", kind:"warehouse",
+  warehouse: { table:"warehouse_snapshots", idField:"warehouse_id", kind:"warehouse", batchField:"batch_no",
                entityCol:"仓库", tableTitle:"最新一次快照 · 分仓库明细",
                metrics:[{k:"qty",label:"货量"}] },
 };
 
 const state = {
   sb:null, source:"route", templates:[], selected:new Set(), metric:"order_count",
-  date:null, byTs:new Map(), tsList:[], allEntities:[], entityName:new Map(), editingId:null, chart:null,
+  batch:null, batches:[], gran:"20m",
+  byTs:new Map(), tsList:[], allEntities:[], entityName:new Map(), editingId:null, chart:null,
 };
 const $ = s => document.querySelector(s);
 function src(){ return SOURCES[state.source]; }
@@ -258,19 +269,83 @@ function localDayRange(dateStr){
 function metricLabel(){ return (src().metrics.find(m=>m.k===state.metric)||{}).label||""; }
 function currentTemplates(){ return state.templates.filter(t=>(t.kind||"route")===state.source); }
 
+function nyDateShort(iso){ const p=new Intl.DateTimeFormat("en-US",{timeZone:TZ,month:"numeric",day:"numeric"}).format(new Date(iso)); return p; }
+function nyDateKey(iso){ return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(iso)); }
+function nyMinute(iso){ const p=new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(iso)).reduce((a,x)=>(a[x.type]=x.value,a),{}); return (+p.hour)*60+(+p.minute); }
+
 function init(){
   if(SUPABASE_URL.includes("你的项目") || SUPABASE_ANON_KEY.includes("在此")){ $("#setup").style.display="block"; return; }
   $("#app").style.display="block";
   state.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  state.date = todayStr(); $("#datePick").value = state.date;
+  if(window.ChartZoom) Chart.register(window.ChartZoom);
   renderMetricSeg();
   bindEvents(); bootstrap();
 }
 async function bootstrap(){
-  try{ await loadTemplates(); await loadEntities(); await loadDay(); setConn(true,"已连接"); }
+  try{ await loadTemplates(); await loadEntities(); await loadBatches(); await loadBatch(); setConn(true,"已连接"); }
   catch(e){ console.error(e); setConn(false,"连接失败："+(e.message||e)); }
 }
 function setConn(ok,text){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=text; }
+
+/* 单号 → 备货(累计)日期。
+   第0天晚9点生成单号(单号里嵌的就是第0天) → 第1天全天备货、货量累计 → 第2天派送。
+   所以 备货日 = 单号里的日期 + 1。纯前端换算，库里不存日期。 */
+function batchStockDate(batch){
+  const m=(batch||"").match(/(20\d{2})(\d{2})(\d{2})/);
+  if(!m) return null;
+  const d=new Date(Date.UTC(+m[1], +m[2]-1, +m[3]+1));   // +1 天
+  if(isNaN(d)) return null;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+}
+function batchLabel(batch){
+  const d=batchStockDate(batch);
+  return d ? `${d} 备货 · ${batch}` : batch;
+}
+
+// 批次下拉：数据表里出现过的单号
+async function loadBatches(){
+  const S=src();
+  const seen=await state.sb.from(S.table).select(S.batchField)
+    .order("captured_at",{ascending:false}).limit(4000);
+  const arr=[...new Set((seen.data||[]).map(r=>r[S.batchField]).filter(Boolean))]
+    .sort((a,b)=>b.localeCompare(a));          // 单号自带日期，倒序即最新在前
+  state.batches=arr;
+  if(!state.batch || !arr.includes(state.batch)) state.batch=arr[0]||null;
+  const sel=$("#batchSelect"); sel.innerHTML="";
+  arr.forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=batchLabel(b); sel.appendChild(o); });
+  if(state.batch) sel.value=state.batch;
+}
+
+// 按单号取该批次全部数据(跨夜也没关系，按 batch 字段筛)
+async function loadBatch(){
+  const S=src();
+  if(!state.batch){ state.byTs=new Map(); state.tsList=[]; renderAll(); return; }
+  let all=[], from=0, page=1000;
+  while(true){
+    const { data, error } = await state.sb.from(S.table).select("*")
+      .eq(S.batchField, state.batch)
+      .order("captured_at",{ascending:true}).range(from,from+page-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data || data.length<page) break; from+=page;
+  }
+  const byTs=new Map();
+  for(const r of all){ if(!byTs.has(r.captured_at)) byTs.set(r.captured_at,new Map()); byTs.get(r.captured_at).set(r[S.idField],r); }
+  state.byTs=byTs; state.tsList=[...byTs.keys()].sort();
+  renderAll();
+}
+
+// 按粒度筛选时间点：1小时只保留整点(:00)
+function visibleTs(){
+  if(state.gran==="1h") return state.tsList.filter(ts=>nyMinute(ts)%60===0);
+  return state.tsList;
+}
+// 图表标签：跨夜时在换日那点加上日期
+function tsLabels(list){
+  let prev=null;
+  return list.map(ts=>{ const dk=nyDateKey(ts); const t=fmtTime(ts);
+    const lab = (prev && dk!==prev) ? `${nyDateShort(ts)} ${t}` : t; prev=dk; return lab; });
+}
 
 // 读取当前数据源"最近出现过的成员"，用于建模板时勾选
 async function loadEntities(){
@@ -306,24 +381,6 @@ function ensureSelection(){
   if(!cur.some(t=>state.selected.has(t.id))) cur.forEach(t=>state.selected.add(t.id));
 }
 
-async function loadDay(){
-  const S=src(); const {startISO,endISO}=localDayRange(state.date);
-  let all=[], from=0, page=1000;
-  while(true){
-    const { data, error } = await state.sb.from(S.table).select("*")
-      .gte("captured_at",startISO).lt("captured_at",endISO)
-      .order("captured_at",{ascending:true}).range(from,from+page-1);
-    if(error) throw error;
-    all=all.concat(data||[]);
-    if(!data || data.length<page) break;
-    from+=page;
-  }
-  const byTs=new Map();
-  for(const r of all){ if(!byTs.has(r.captured_at)) byTs.set(r.captured_at,new Map()); byTs.get(r.captured_at).set(r[S.idField],r); }
-  state.byTs=byTs; state.tsList=[...byTs.keys()].sort();
-  renderAll();
-}
-
 function seriesSumAt(ids,ts){ const m=state.byTs.get(ts); if(!m) return 0; let s=0; for(const id of ids){ const r=m.get(id); if(r) s+=(r[state.metric]||0); } return s; }
 
 // 画图/卡片用的系列：
@@ -349,7 +406,8 @@ function selectedMemberIds(){
 
 function renderAll(){
   renderCards(); renderChart(); renderTable();
-  $("#chartSub").textContent=`${state.date} · ${metricLabel()} · 纽约时间`;
+  const sd=state.batch?batchStockDate(state.batch):null;
+  $("#chartSub").textContent=`${sd?sd+" 备货 · ":""}${state.batch||"—"} · ${metricLabel()} · 纽约时间`;
   $("#tableTitle").textContent=src().tableTitle;
 }
 
@@ -374,7 +432,7 @@ async function switchSource(s){
   ensureSelection();
   renderChips(); renderTplList();
   setConn(true,"加载中…");
-  try{ await loadEntities(); await loadDay(); renderTplList(); setConn(true,"已连接"); }
+  try{ await loadEntities(); await loadBatches(); await loadBatch(); renderTplList(); setConn(true,"已连接"); }
   catch(e){ setConn(false,"连接失败："+(e.message||e)); }
 }
 
@@ -412,23 +470,25 @@ function renderCards(){
 }
 function renderChart(){
   const series=plotSeries();
-  const labels=state.tsList.map(fmtTime);
-  const datasets=series.map(s=>({label:s.name,data:state.tsList.map(ts=>seriesSumAt(s.ids,ts)),
+  const ts=visibleTs();
+  const labels=tsLabels(ts);
+  const datasets=series.map(s=>({label:s.name,data:ts.map(t=>seriesSumAt(s.ids,t)),
     borderColor:s.color,backgroundColor:s.color,tension:.25,pointRadius:2,pointHoverRadius:5,borderWidth:2}));
   const cfg={type:"line",data:{labels,datasets},options:{
     responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
     plugins:{legend:{labels:{color:"#83838d",font:{family:"Space Grotesk"}}},
-      tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3"}},
-    scales:{x:{ticks:{color:"#5b5b64",maxRotation:0,autoSkip:true,maxTicksLimit:12,font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"}},
+      tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3"},
+      zoom:{ pan:{enabled:true,mode:"x"}, zoom:{wheel:{enabled:true},pinch:{enabled:true},drag:{enabled:false},mode:"x"} }},
+    scales:{x:{ticks:{color:"#5b5b64",maxRotation:0,autoSkip:true,maxTicksLimit:14,font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"}},
       y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:true}}}};
-  if(state.chart){ state.chart.data=cfg.data; state.chart.options=cfg.options; state.chart.update(); }
-  else state.chart=new Chart($("#chart"),cfg);
-  if(state.tsList.length===0){ $("#chartBox").innerHTML=`<div class="empty"><div class="big">这一天暂无数据</div>确认抓取脚本在运行，并且日期/数据源选对了。</div>`; state.chart=null; }
+  if(state.chart){ state.chart.destroy(); }
+  state.chart=new Chart($("#chart"),cfg);
+  if(state.tsList.length===0){ $("#chartBox").innerHTML=`<div class="empty"><div class="big">该批次暂无数据</div>换个单号，或确认抓取脚本在跑。</div>`; state.chart=null; }
 }
 function renderTable(){
   const wrap=$("#tableWrap"); const series=plotSeries(); const latest=state.tsList[state.tsList.length-1];
   if(series.length===0){ wrap.innerHTML=`<div class="empty">选择上方的模板后显示明细。</div>`; $("#tableSub").textContent=""; return; }
-  if(!latest){ wrap.innerHTML=`<div class="empty">这一天暂无数据。</div>`; $("#tableSub").textContent=""; return; }
+  if(!latest){ wrap.innerHTML=`<div class="empty">该批次暂无数据。</div>`; $("#tableSub").textContent=""; return; }
   $("#tableSub").textContent=fmtTime(latest);
   const ids=selectedMemberIds();
   const m=state.byTs.get(latest); const rows=[...ids].sort((a,b)=>a-b);
@@ -527,8 +587,13 @@ function renderTplList(){
 
 function bindEvents(){
   $("#sourceSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>switchSource(b.dataset.s));
-  $("#datePick").onchange=e=>{ state.date=e.target.value; loadDay().catch(err=>setConn(false,err.message)); };
-  $("#refreshBtn").onclick=()=>{ loadEntities().then(loadDay).catch(err=>setConn(false,err.message)); };
+  $("#batchSelect").onchange=e=>{ state.batch=e.target.value; loadBatch().catch(err=>setConn(false,err.message)); };
+  $("#granSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    $("#granSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); state.gran=b.dataset.g; renderChart();
+  });
+  $("#resetZoom").onclick=()=>{ if(state.chart&&state.chart.resetZoom) state.chart.resetZoom(); };
+  $("#refreshBtn").onclick=()=>{ loadEntities().then(loadBatches).then(loadBatch).catch(err=>setConn(false,err.message)); };
   $("#manageBtn").onclick=()=>openModal(null);
   $("#modalCancel").onclick=closeModal;
   $("#modalBack").onclick=e=>{ if(e.target.id==="modalBack") closeModal(); };

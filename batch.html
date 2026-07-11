@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Night Dispatch · 当前单号</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .wrap{max-width:640px;margin:0 auto;padding:26px 22px 70px}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap}
+  .brand{display:flex;flex-direction:column;gap:3px}
+  .brand .kick{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--orange);font-weight:600}
+  .brand h1{margin:0;font-size:24px;font-weight:700}
+  .brand .sub{color:var(--muted);font-size:13px}
+  .conn{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .dot.ok{background:var(--green)}.dot.err{background:var(--red)}
+  .cur{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:20px;margin-bottom:22px;position:relative;overflow:hidden}
+  .cur .accentbar{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--orange)}
+  .cur .lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+  .cur .big{font-family:var(--mono);font-size:26px;font-weight:700;word-break:break-all}
+  .cur .row2{display:flex;gap:22px;flex-wrap:wrap;margin-top:14px}
+  .cur .sm{font-size:12px;color:var(--faint)}
+  .cur .sm b{color:var(--ink);font-family:var(--mono)}
+  .panel{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:20px}
+  .panel h2{margin:0 0 16px;font-size:15px}
+  .fld{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .fld label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .fld .tip{font-size:11.5px;color:var(--faint)}
+  input{background:var(--raised);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:11px 12px;font-size:14px;font-family:var(--mono);width:100%}
+  input:focus{outline:none;border-color:var(--orange)}
+  .btnrow{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:var(--raised);color:var(--ink);padding:11px 16px;border-radius:9px;font-size:13.5px;font-weight:600}
+  .btn:hover{border-color:var(--muted)}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a1205}
+  .btn.primary:hover{background:#f59a4d}
+  .btn.ghost{background:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--ink)}
+  .msg{font-size:13px;margin-left:4px}
+  .msg.ok{color:var(--green)}.msg.err{color:var(--red)}
+  .badge{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+    padding:3px 7px;border-radius:5px;background:var(--raised);border:1px solid var(--line);color:var(--muted);margin-left:6px}
+  .badge.auto{background:rgba(236,139,60,.14);border-color:var(--orange);color:var(--orange)}
+  .switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:13.5px}
+  .switch input{width:17px;height:17px;accent-color:var(--orange);cursor:pointer}
+  .setup{max-width:640px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px}
+  .setup h2{margin:0 0 10px}.setup p{color:var(--muted);font-size:13.5px;line-height:1.6}
+  .setup code{background:var(--raised);padding:2px 6px;border-radius:5px;font-family:var(--mono);color:var(--orange)}
+</style>
+</head>
+<body data-page="batch">
+<div id="nav-slot"></div>
+
+<div id="setup" class="setup" style="display:none">
+  <h2>还差一步：填入 Supabase 连接信息</h2>
+  <p>把本文件顶部 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code> 换成你的值后刷新。</p>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+  <header class="top">
+    <div class="brand">
+      <div class="kick">Night Dispatch</div>
+      <h1>当前抓取单号</h1>
+      <div class="sub">在这里改单号，Mac 上的抓取脚本下一轮自动生效</div>
+    </div>
+    <div class="conn"><span class="dot" id="connDot"></span><span id="connText">连接中…</span></div>
+  </header>
+
+  <div class="cur">
+    <div class="accentbar"></div>
+    <div class="lab">正在使用的路线单号 <span id="modeBadge" class="badge">—</span></div>
+    <div class="big" id="curBatch">—</div>
+    <div class="row2">
+      <span class="sm">备货日：<b id="curBizDate">—</b></span>
+      <span class="sm">仓库单号：<b id="curBatchNo">—</b></span>
+      <span class="sm">最后修改：<b id="curUpdated">—</b></span>
+      <span class="sm" id="curByWrap" style="display:none">修改人：<b id="curBy">—</b></span>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:18px">
+    <h2>单号模式</h2>
+    <label class="switch">
+      <input type="checkbox" id="autoToggle" />
+      <span>自动跟随最新的 Delivery 批次</span>
+    </label>
+    <div class="tip" style="margin-top:8px">
+      开启后，抓取脚本每 20 分钟会去调度列表里找 name 带 “Delivery”、派送日期最新的那条，
+      自动切到它的单号（每晚 21 点左右新批次生成时切换）。关掉则用下面手动设的单号。
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>手动更换单号</h2>
+    <div class="fld">
+      <label>路线单号 batch_list</label>
+      <input type="text" id="inBatch" placeholder="NJSUB-202607092100" />
+      <div class="btnrow">
+        <button class="btn ghost" id="fillToday">填入今天</button>
+      </div>
+    </div>
+    <div class="fld">
+      <label>仓库单号 batch_no（可留空）</label>
+      <input type="text" id="inBatchNo" placeholder="留空 = 和路线单号一样" />
+      <div class="tip">通常和路线单号相同，留空即可；只有两者不同时才单独填。</div>
+    </div>
+    <div class="fld">
+      <label>修改人（可选）</label>
+      <input type="text" id="inBy" placeholder="你的名字，方便日后查是谁改的" />
+    </div>
+    <div class="btnrow">
+      <button class="btn primary" id="saveBtn">保存</button>
+      <button class="btn" id="reloadBtn">刷新</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch("nav.html").then(r=>r.text()).then(h=>{document.getElementById("nav-slot").innerHTML=h;});
+
+/* ===== Supabase（SUPABASE_ANON_KEY 填 Publishable key sb_publishable_…） ===== */
+const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
+/* ============================================================== */
+
+const TZ="America/New_York";
+const $=s=>document.querySelector(s);
+let sb=null;
+
+function nyDateStr(offset){ // 纽约日期 YYYY-MM-DD，offset 天
+  const base=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const [y,m,d]=base.split("-").map(Number);
+  const nd=new Date(Date.UTC(y,m-1,d+(offset||0)));
+  return `${nd.getUTCFullYear()}-${String(nd.getUTCMonth()+1).padStart(2,"0")}-${String(nd.getUTCDate()).padStart(2,"0")}`;
+}
+function nyDateCompact(offset){ return nyDateStr(offset).replaceAll("-",""); }
+/* 第0天晚9点生成单号(单号里嵌的就是第0天) → 第1天全天备货、货量累计 → 第2天派送。
+   备货日 = 单号里的日期 + 1。纯前端换算，Supabase 里不存日期。 */
+function batchStockDate(batch){
+  const m=(batch||"").match(/(20\d{2})(\d{2})(\d{2})/);
+  if(!m) return null;
+  const d=new Date(Date.UTC(+m[1], +m[2]-1, +m[3]+1));
+  if(isNaN(d)) return null;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+}
+function fmtTs(iso){ if(!iso) return "—"; return new Date(iso).toLocaleString("en-CA",{timeZone:TZ,hour12:false}); }
+function setConn(ok,t){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=t; }
+function setMsg(t,ok){ const m=$("#msg"); m.textContent=t; m.className="msg "+(ok?"ok":"err"); if(t) setTimeout(()=>{m.textContent="";},4000); }
+
+function init(){
+  if(SUPABASE_URL.includes("你的项目")||SUPABASE_ANON_KEY.includes("在此")){ $("#setup").style.display="block"; return; }
+  $("#app").style.display="block";
+  sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  $("#saveBtn").onclick=save;
+  $("#reloadBtn").onclick=load;
+  $("#fillToday").onclick=()=>{ $("#inBatch").value=`NJSUB-${nyDateCompact(0)}2100`; };
+  $("#autoToggle").onchange=setAuto;
+  load();
+}
+
+async function load(){
+  try{
+    const { data, error } = await sb.from("run_config").select("*").eq("id",1).single();
+    if(error) throw error;
+    $("#curBatch").textContent = data.batch_list || "（未设置）";
+    $("#curBatchNo").textContent = (data.batch_no && data.batch_no.trim()) ? data.batch_no : "（同路线单号）";
+    $("#curUpdated").textContent = fmtTs(data.updated_at);
+    if(data.updated_by){ $("#curByWrap").style.display=""; $("#curBy").textContent=data.updated_by; }
+    // 预填输入框方便微调
+    $("#inBatch").value = data.batch_list || "";
+    $("#inBatchNo").value = data.batch_no || "";
+    // 读这个单号的业务日期
+    $("#curBizDate").textContent = batchStockDate(data.batch_list) || "—";
+    const auto = data.auto_batch !== false;
+    $("#autoToggle").checked = auto;
+    const badge=$("#modeBadge");
+    badge.textContent = auto ? "自动" : "手动";
+    badge.className = "badge" + (auto ? " auto" : "");
+    setConn(true,"已连接");
+  }catch(e){ console.error(e); setConn(false,"连接失败："+(e.message||e)); }
+}
+
+async function setAuto(){
+  const auto=$("#autoToggle").checked;
+  try{
+    const { error } = await sb.from("run_config")
+      .update({auto_batch:auto, updated_at:new Date().toISOString(), updated_by:"web"}).eq("id",1);
+    if(error) throw error;
+    setMsg(auto?"已开启自动跟随 ✓":"已切到手动模式 ✓", true);
+    load();
+  }catch(e){ setMsg("切换失败："+(e.message||e), false); $("#autoToggle").checked=!auto; }
+}
+
+async function save(){
+  const batch_list=$("#inBatch").value.trim();
+  const batch_no=$("#inBatchNo").value.trim();
+  const updated_by=$("#inBy").value.trim()||null;
+  if(!batch_list){ setMsg("路线单号不能为空",false); return; }
+  if($("#autoToggle").checked && !confirm("当前是【自动】模式，手动改的单号下一轮会被自动检测覆盖。\n要不要先关掉自动？\n\n点“取消”去关自动；点“确定”仍然手动保存。")) return;
+  if(!confirm(`确认把抓取单号改成：\n${batch_list}\n（备货日 ${batchStockDate(batch_list)||"?"}）`)) return;
+  try{
+    const { error } = await sb.from("run_config")
+      .update({batch_list, batch_no, updated_by, updated_at:new Date().toISOString()})
+      .eq("id",1);
+    if(error) throw error;
+    setMsg("已保存，抓取脚本下一轮生效 ✓",true);
+    load();
+  }catch(e){ console.error(e); setMsg("保存失败："+(e.message||e),false); }
+}
+
+init();
+</script>
+</body>
+</html>
