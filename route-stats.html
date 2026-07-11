@@ -226,6 +226,7 @@
 /* =====================================================================
    Supabase 连接信息（SUPABASE_ANON_KEY 填 Publishable key sb_publishable_…）
    ===================================================================== */
+fetch("nav.html").then(r=>r.text()).then(h=>{document.getElementById("nav-slot").innerHTML=h;});
 const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
 /* ===================================================================== */
