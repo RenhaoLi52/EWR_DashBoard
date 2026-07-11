@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Night Dispatch · 货量预测</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 22px 70px}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap}
+  .brand{display:flex;flex-direction:column;gap:3px}
+  .brand .kick{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--orange);font-weight:600}
+  .brand h1{margin:0;font-size:25px;font-weight:700;letter-spacing:-.01em}
+  .brand .sub{color:var(--muted);font-size:13px}
+  .conn{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+  .dot.ok{background:var(--green)}.dot.err{background:var(--red)}
+  .controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
+  .fld{display:flex;flex-direction:column;gap:6px}
+  .fld label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  input,select{background:var(--raised);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:10px 12px;font-size:13.5px;font-family:var(--mono)}
+  input:focus,select:focus{outline:none;border-color:var(--orange)}
+  .btn{border:1px solid var(--line);background:var(--raised);color:var(--ink);padding:10px 15px;border-radius:9px;font-size:13px;font-weight:600;transition:.14s}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a1205}
+  .btn.primary:hover{background:#f59a4d}
+  .spacer{flex:1 1 auto}
+  .result{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;margin-bottom:22px}
+  @media(max-width:720px){.result{grid-template-columns:1fr}}
+  .rcard{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:18px 19px;position:relative;overflow:hidden}
+  .rcard .accentbar{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--orange)}
+  .rcard .lab{font-size:12px;color:var(--muted);margin-bottom:9px}
+  .rcard .big{font-family:var(--mono);font-size:38px;font-weight:700;line-height:1;letter-spacing:-.01em}
+  .rcard .rng{font-family:var(--mono);font-size:14px;color:var(--orange);margin-top:7px}
+  .rcard .sub{font-size:12px;color:var(--faint);margin-top:9px;line-height:1.5}
+  .rcard .mid{font-family:var(--mono);font-size:22px;font-weight:600}
+  .panel{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden;margin-bottom:22px}
+  .phead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  .phead .tick{width:4px;height:15px;border-radius:2px;background:var(--orange)}
+  .phead h2{margin:0;font-size:14px;font-weight:600}
+  .phead .hint{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .pbody{padding:16px}
+  #chartBox{position:relative;height:360px}
+  .empty{color:var(--muted);text-align:center;padding:42px 12px;font-size:13.5px}
+  .note{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--muted);font-size:12.5px;line-height:1.6;margin-bottom:20px}
+  .note b{color:var(--ink)}
+  .setup{max-width:640px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px}
+  .setup h2{margin:0 0 10px;font-size:18px}.setup p{color:var(--muted);font-size:13.5px;line-height:1.6}
+  .setup code{background:var(--raised);padding:2px 6px;border-radius:5px;font-family:var(--mono);color:var(--orange)}
+  @media (prefers-reduced-motion:no-preference){.rcard,.panel{animation:fade .28s ease both}@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+</style>
+</head>
+<body data-page="forecast">
+<div id="nav-slot"></div>
+
+<div id="setup" class="setup" style="display:none">
+  <h2>还差一步：填入 Supabase 连接信息</h2>
+  <p>打开本文件，把顶部 <code>SUPABASE_URL</code> 和 <code>SUPABASE_ANON_KEY</code> 换成你的值后刷新。</p>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+  <header class="top">
+    <div class="brand">
+      <div class="kick">Night Dispatch</div>
+      <h1>货量预测</h1>
+      <div class="sub">按历史日内进度曲线，预测某仓库某时刻的累计货量</div>
+    </div>
+    <div class="conn"><span class="dot" id="connDot"></span><span id="connText">连接中…</span></div>
+  </header>
+
+  <div class="controls">
+    <div class="fld"><label>仓库</label><select id="whSelect" style="min-width:200px"></select></div>
+    <div class="fld"><label>目标日期</label><input type="date" id="datePick" /></div>
+    <div class="fld"><label>目标时间</label><input type="time" id="timePick" value="19:00" step="600" /></div>
+    <div class="fld"><label>训练天数</label><input type="number" id="nDays" value="10" min="2" max="60" style="width:90px" /></div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="predictBtn">预测</button>
+  </div>
+
+  <div class="note">
+    原理：用过去 N 天该仓库的累计曲线，归一化成“占当日最终值的百分比 vs 时间”求平均，得到典型日内进度。
+    若目标当天已有数据，会用最新的点<b>反推今天的最终值</b>再预测（更准）；当天还没数据则用历史平均。
+    <b>范围</b>来自历史同一时刻的波动。数据越多、当天已抓到的点越多，越准。
+  </div>
+
+  <div class="result" id="result"></div>
+
+  <div class="panel">
+    <div class="phead"><span class="tick"></span><h2>日内曲线</h2><span class="hint" id="chartSub"></span></div>
+    <div class="pbody"><div id="chartBox"><canvas id="chart"></canvas></div></div>
+  </div>
+</div>
+
+<script>
+fetch("nav.html").then(r=>r.text()).then(h=>{document.getElementById("nav-slot").innerHTML=h;});
+
+/* ===== Supabase（SUPABASE_ANON_KEY 填 Publishable key sb_publishable_…） ===== */
+const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
+/* ============================================================== */
+
+const TZ="America/New_York";
+const $=s=>document.querySelector(s);
+let sb=null, chart=null;
+
+function nyParts(d){
+  const p=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"})
+    .formatToParts(d).reduce((a,x)=>(a[x.type]=x.value,a),{});
+  return {date:`${p.year}-${p.month}-${p.day}`, min:(+p.hour)*60+(+p.minute)};
+}
+function todayStr(){ return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
+function tzOffset(date){
+  const p=new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
+    .formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});
+  return (Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)-date.getTime())/60000;
+}
+function nyMidnightUTC(y,m,d){const g=Date.UTC(y,m-1,d,0,0,0);let o=tzOffset(new Date(g));let i=g-o*60000;o=tzOffset(new Date(i));return g-o*60000;}
+function addDays(dateStr,delta){const [y,m,d]=dateStr.split("-").map(Number);const nd=new Date(Date.UTC(y,m-1,d+delta));return `${nd.getUTCFullYear()}-${String(nd.getUTCMonth()+1).padStart(2,"0")}-${String(nd.getUTCDate()).padStart(2,"0")}`;}
+function hhmm(min){return `${String(Math.floor(min/60)).padStart(2,"0")}:${String(min%60).padStart(2,"0")}`;}
+function rangeISO(dateStr,n){
+  const s=addDays(dateStr,-n), e=addDays(dateStr,1);
+  const [sy,sm,sd]=s.split("-").map(Number), [ey,em,ed]=e.split("-").map(Number);
+  return { startISO:new Date(nyMidnightUTC(sy,sm,sd)).toISOString(), endISO:new Date(nyMidnightUTC(ey,em,ed)).toISOString() };
+}
+
+/* ---- 预测数学 ---- */
+function qtyAt(pts,t){
+  if(!pts.length) return null;
+  if(t<=pts[0].min) return pts[0].qty;
+  if(t>=pts[pts.length-1].min) return pts[pts.length-1].qty;
+  for(let i=1;i<pts.length;i++){ if(t<=pts[i].min){ const a=pts[i-1],b=pts[i]; return a.qty+(b.qty-a.qty)*((t-a.min)/(b.min-a.min)); } }
+  return pts[pts.length-1].qty;
+}
+const dayFinal=pts=>pts.length?Math.max(...pts.map(p=>p.qty)):0;
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+const std=a=>a.length<2?0:Math.sqrt(mean(a.map(x=>(x-mean(a))**2)));
+
+function buildModel(history){
+  const days=history.filter(d=>dayFinal(d.points)>0 && d.points.length>=3);
+  const finals=days.map(d=>dayFinal(d.points));
+  const fbar=t=> days.length?mean(days.map(d=>qtyAt(d.points,t)/dayFinal(d.points))):0;
+  const fsig=t=> days.length?std(days.map(d=>qtyAt(d.points,t)/dayFinal(d.points))):0;
+  return {days, histFinal:days.length?mean(finals):0, histFinalStd:days.length?std(finals):0, fbar, fsig};
+}
+function predict(model, targetPoints, T){
+  if(model.days.length===0) return {ok:false};
+  const before=(targetPoints||[]).filter(p=>p.min<=T).sort((a,b)=>a.min-b.min);
+  let estFinal, calibrated=false, anchor=null;
+  if(before.length){ anchor=before[before.length-1]; const fa=model.fbar(anchor.min);
+    if(fa>0.1){ estFinal=anchor.qty/fa; calibrated=true; } else estFinal=model.histFinal; }
+  else estFinal=model.histFinal;
+  const fT=model.fbar(T), sT=model.fsig(T);
+  const pred=estFinal*fT;
+  let band=estFinal*sT + (calibrated?0:model.histFinalStd*fT);
+  band=Math.max(band, pred*0.03);
+  return {ok:true, pred:Math.round(pred), band:Math.round(band), lo:Math.max(0,Math.round(pred-band)), hi:Math.round(pred+band),
+          estFinal:Math.round(estFinal), calibrated, anchor, daysUsed:model.days.length};
+}
+
+/* ---- 初始化 ---- */
+function init(){
+  if(SUPABASE_URL.includes("你的项目")||SUPABASE_ANON_KEY.includes("在此")){ $("#setup").style.display="block"; return; }
+  $("#app").style.display="block";
+  sb=supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  $("#datePick").value=todayStr();
+  $("#predictBtn").onclick=doPredict;
+  loadWarehouses().then(()=>{ setConn(true,"已连接"); doPredict(); }).catch(e=>setConn(false,"连接失败："+(e.message||e)));
+}
+function setConn(ok,t){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=t; }
+
+async function loadWarehouses(){
+  const { data, error } = await sb.from("warehouse_snapshots").select("warehouse_id,warehouse_name")
+    .order("captured_at",{ascending:false}).limit(3000);
+  if(error) throw error;
+  const map=new Map(); (data||[]).forEach(r=>{ if(!map.has(r.warehouse_id)) map.set(r.warehouse_id,r.warehouse_name||String(r.warehouse_id)); });
+  const arr=[...map.entries()].map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
+  const sel=$("#whSelect"); sel.innerHTML="";
+  arr.forEach(w=>{ const o=document.createElement("option"); o.value=w.id; o.textContent=`${w.name} (${w.id})`; sel.appendChild(o); });
+}
+
+async function fetchDays(whId, dateStr, n){
+  const {startISO,endISO}=rangeISO(dateStr,n);
+  let all=[],from=0,page=1000;
+  while(true){
+    const { data, error } = await sb.from("warehouse_snapshots").select("captured_at,qty")
+      .eq("warehouse_id",whId).gte("captured_at",startISO).lt("captured_at",endISO)
+      .order("captured_at",{ascending:true}).range(from,from+page-1);
+    if(error) throw error;
+    all=all.concat(data||[]);
+    if(!data||data.length<page) break; from+=page;
+  }
+  const byDate=new Map();
+  for(const r of all){ const {date,min}=nyParts(new Date(r.captured_at));
+    if(!byDate.has(date)) byDate.set(date,[]); byDate.get(date).push({min,qty:r.qty}); }
+  for(const pts of byDate.values()) pts.sort((a,b)=>a.min-b.min);
+  return byDate;
+}
+
+async function doPredict(){
+  const whId=Number($("#whSelect").value);
+  const dateStr=$("#datePick").value;
+  const n=Math.max(2,Number($("#nDays").value)||10);
+  const [th,tm]=$("#timePick").value.split(":").map(Number);
+  const T=th*60+tm;
+  if(!whId||!dateStr) return;
+  setConn(true,"计算中…");
+  try{
+    const byDate=await fetchDays(whId,dateStr,n);
+    const targetPoints=byDate.get(dateStr)||[];
+    const histDates=[...byDate.keys()].filter(d=>d<dateStr).sort().slice(-n);
+    const history=histDates.map(d=>({date:d,points:byDate.get(d)}));
+    const model=buildModel(history);
+    const res=predict(model,targetPoints,T);
+    renderResult(res,targetPoints,T,dateStr);
+    renderChart(model,history,targetPoints,res,T);
+    setConn(true,"已连接");
+  }catch(e){ console.error(e); setConn(false,"出错："+(e.message||e)); }
+}
+
+function renderResult(res,targetPoints,T,dateStr){
+  const box=$("#result");
+  if(!res.ok){ box.innerHTML=`<div class="rcard"><div class="accentbar"></div><div class="lab">预测</div><div class="empty" style="padding:10px 0">历史数据不足，先多攒几天再来。至少要有 2 天、建议 7–10 天。</div></div>`; return; }
+  const actual = targetPoints.length ? qtyAt(targetPoints, T) : null;
+  const actualShown = (targetPoints.length && targetPoints[targetPoints.length-1].min>=T) ? Math.round(actual) : null;
+  const warn = res.daysUsed<7 ? `<div class="sub" style="color:var(--orange)">⚠ 只用了 ${res.daysUsed} 天历史，精度有限，攒够 7–10 天更稳。</div>` : "";
+  box.innerHTML=`
+    <div class="rcard"><div class="accentbar"></div>
+      <div class="lab">${dateStr} · ${hhmm(T)} 预测货量</div>
+      <div class="big num">${res.pred.toLocaleString()}</div>
+      <div class="rng">± ${res.band}　( ${res.lo} – ${res.hi} )</div>
+      ${warn}
+    </div>
+    <div class="rcard"><div class="accentbar" style="background:var(--blue)"></div>
+      <div class="lab">估计当天最终货量</div>
+      <div class="mid num">${res.estFinal.toLocaleString()}</div>
+      <div class="sub">${res.calibrated
+        ? `已用当天 ${hhmm(res.anchor.min)} 的实测 ${res.anchor.qty} 校准`
+        : `当天 ${hhmm(T)} 前无数据，用历史平均`}</div>
+    </div>
+    <div class="rcard"><div class="accentbar" style="background:var(--green)"></div>
+      <div class="lab">${actualShown!=null?"当天实际（已抓到）":"参考"}</div>
+      <div class="mid num">${actualShown!=null?actualShown.toLocaleString():"—"}</div>
+      <div class="sub">${actualShown!=null
+        ? `预测误差 ${Math.abs(res.pred-actualShown)}（${(Math.abs(res.pred-actualShown)/Math.max(1,actualShown)*100).toFixed(1)}%）`
+        : `训练用了 ${res.daysUsed} 天历史`}</div>
+    </div>`;
+}
+
+function renderChart(model,history,targetPoints,res,T){
+  const mins=[]; history.forEach(d=>d.points.forEach(p=>mins.push(p.min))); targetPoints.forEach(p=>mins.push(p.min));
+  let lo=mins.length?Math.min(...mins):300, hi=mins.length?Math.max(...mins):1140;
+  hi=Math.max(hi,T); lo=Math.min(lo,T);
+  const grid=[]; for(let t=Math.floor(lo/20)*20;t<=Math.ceil(hi/20)*20;t+=20) grid.push(t);
+  const labels=grid.map(hhmm);
+  const ds=[];
+  // 历史各天（灰）
+  history.forEach(d=>{ const f=d.points[0].min,l=d.points[d.points.length-1].min;
+    ds.push({label:d.date,data:grid.map(t=>(t>=f&&t<=l)?Math.round(qtyAt(d.points,t)):null),
+      borderColor:"rgba(131,131,141,.28)",borderWidth:1,pointRadius:0,tension:.25,spanGaps:false}); });
+  // 预测区间带
+  if(res.ok){
+    ds.push({label:"上界",data:grid.map(t=>Math.round(res.estFinal*(model.fbar(t)+model.fsig(t)))),
+      borderColor:"transparent",backgroundColor:"rgba(236,139,60,.10)",pointRadius:0,fill:"+1",tension:.3,order:5});
+    ds.push({label:"下界",data:grid.map(t=>Math.round(res.estFinal*Math.max(0,model.fbar(t)-model.fsig(t)))),
+      borderColor:"transparent",pointRadius:0,fill:false,tension:.3,order:5});
+    // 预测曲线（橙虚线）
+    ds.push({label:"预测曲线",data:grid.map(t=>Math.round(res.estFinal*model.fbar(t))),
+      borderColor:"#ec8b3c",borderDash:[6,4],borderWidth:2,pointRadius:0,tension:.3,order:2});
+  }
+  // 当天实测（绿）
+  if(targetPoints.length){ const l=targetPoints[targetPoints.length-1].min;
+    ds.push({label:"当天实测",data:grid.map(t=>t<=l?Math.round(qtyAt(targetPoints,t)):null),
+      borderColor:"#5bb98c",borderWidth:2.5,pointRadius:2,tension:.25,spanGaps:false,order:1}); }
+  // 预测点
+  if(res.ok){ ds.push({label:`预测 ${hhmm(T)}`,data:grid.map(t=>t===grid.find(g=>g>=T)?res.pred:null),
+    borderColor:"#ec8b3c",backgroundColor:"#ec8b3c",pointRadius:6,pointHoverRadius:7,showLine:false,order:0}); }
+
+  const cfg={type:"line",data:{labels,datasets:ds},options:{
+    responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{labels:{color:"#83838d",font:{family:"Space Grotesk"},filter:i=>!["上界","下界"].includes(i.text)&&!/^\d{4}-/.test(i.text)}},
+      tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3",
+        filter:i=>!["上界","下界"].includes(i.dataset.label)}},
+    scales:{x:{ticks:{color:"#5b5b64",maxRotation:0,autoSkip:true,maxTicksLimit:12,font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"}},
+      y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:true}}}};
+  if(chart) chart.destroy();
+  chart=new Chart($("#chart"),cfg);
+  $("#chartSub").textContent=`灰=历史各天 · 橙虚线=预测 · 绿=当天实测 · 纽约时间`;
+}
+
+init();
+</script>
+</body>
+</html>
