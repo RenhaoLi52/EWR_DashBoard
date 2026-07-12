@@ -78,10 +78,10 @@
   </header>
 
   <div class="controls">
-    <div class="fld"><label>仓库</label><select id="whSelect" style="min-width:200px"></select></div>
-    <div class="fld"><label>目标日期</label><input type="date" id="datePick" /></div>
-    <div class="fld"><label>目标时间</label><input type="time" id="timePick" value="19:00" step="600" /></div>
-    <div class="fld"><label>训练天数</label><input type="number" id="nDays" value="10" min="2" max="60" style="width:90px" /></div>
+    <div class="fld"><label>仓库</label><select id="whSelect" style="min-width:190px"></select></div>
+    <div class="fld"><label>目标批次</label><select id="batchSelect" style="min-width:230px"></select></div>
+    <div class="fld"><label>目标时间（备货日）</label><input type="time" id="timePick" value="19:00" step="600" /></div>
+    <div class="fld"><label>训练批次数</label><input type="number" id="nDays" value="10" min="2" max="60" style="width:96px" /></div>
     <div class="spacer"></div>
     <button class="btn primary" id="predictBtn">预测</button>
   </div>
@@ -111,189 +111,259 @@ const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
 const TZ="America/New_York";
 const $=s=>document.querySelector(s);
 let sb=null, chart=null;
+const state={ batches:[] };
 
-function nyParts(d){
-  const p=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"})
-    .formatToParts(d).reduce((a,x)=>(a[x.type]=x.value,a),{});
-  return {date:`${p.year}-${p.month}-${p.day}`, min:(+p.hour)*60+(+p.minute)};
-}
-function todayStr(){ return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); }
+/* ---------- 纽约时区工具 ---------- */
 function tzOffset(date){
   const p=new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
     .formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});
   return (Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second)-date.getTime())/60000;
 }
-function nyMidnightUTC(y,m,d){const g=Date.UTC(y,m-1,d,0,0,0);let o=tzOffset(new Date(g));let i=g-o*60000;o=tzOffset(new Date(i));return g-o*60000;}
-function addDays(dateStr,delta){const [y,m,d]=dateStr.split("-").map(Number);const nd=new Date(Date.UTC(y,m-1,d+delta));return `${nd.getUTCFullYear()}-${String(nd.getUTCMonth()+1).padStart(2,"0")}-${String(nd.getUTCDate()).padStart(2,"0")}`;}
-function hhmm(min){return `${String(Math.floor(min/60)).padStart(2,"0")}:${String(min%60).padStart(2,"0")}`;}
-function rangeISO(dateStr,n){
-  const s=addDays(dateStr,-n), e=addDays(dateStr,1);
-  const [sy,sm,sd]=s.split("-").map(Number), [ey,em,ed]=e.split("-").map(Number);
-  return { startISO:new Date(nyMidnightUTC(sy,sm,sd)).toISOString(), endISO:new Date(nyMidnightUTC(ey,em,ed)).toISOString() };
+/* 纽约本地时间 → UTC 毫秒 */
+function nyToUTC(y,mo,d,h,mi){
+  const guess=Date.UTC(y,mo-1,d,h,mi);
+  let off=tzOffset(new Date(guess));
+  let inst=guess-off*60000;
+  off=tzOffset(new Date(inst));
+  return guess-off*60000;
+}
+/* UTC 瞬间 → 纽约的 {日期, 钟点} */
+function nyStamp(ms){
+  const p=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"})
+    .formatToParts(new Date(ms)).reduce((a,x)=>(a[x.type]=x.value,a),{});
+  return { date:`${p.year}-${p.month}-${p.day}`, hm:`${p.hour}:${p.minute}` };
 }
 
-/* ---- 预测数学 ---- */
+/* ---------- 单号解析 ----------
+   NJSUB-YYYYMMDDHHMM：第0天生成时刻，就是这个批次的“起点”。
+   备货日(第1天) = 第0天 + 1。派送(第2天) = 第0天 + 2。 */
+function batchStart(batch){                       // → UTC 毫秒
+  const m=(batch||"").match(/(20\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+  if(!m) return null;
+  return nyToUTC(+m[1],+m[2],+m[3],+m[4],+m[5]);
+}
+function stockDay(batch){                         // 备货日 = 单号日期 + 1
+  const m=(batch||"").match(/(20\d{2})(\d{2})(\d{2})/);
+  if(!m) return null;
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]+1));
+  return {y:d.getUTCFullYear(), mo:d.getUTCMonth()+1, d:d.getUTCDate(),
+          str:`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`};
+}
+function batchLabel(b){ const s=stockDay(b); return s ? `${s.str} 备货 · ${b}` : b; }
+
+/* 批次内的相对时间(分钟) ←→ 显示标签 */
+function elapsedMin(capturedISO, start){ return Math.round((new Date(capturedISO).getTime()-start)/60000); }
+function tLabel(t, start){ const s=nyStamp(start+t*60000); return s.hm; }
+
+/* 目标时刻：备货日的某个钟点 → 相对分钟 */
+function targetT(batch, hhmm){
+  const sd=stockDay(batch), start=batchStart(batch);
+  if(!sd||start==null) return null;
+  const [h,mi]=hhmm.split(":").map(Number);
+  return Math.round((nyToUTC(sd.y,sd.mo,sd.d,h,mi)-start)/60000);
+}
+function hhmmOf(t,start){ return tLabel(t,start); }
+
+/* ---------- 预测数学 ---------- */
 function qtyAt(pts,t){
   if(!pts.length) return null;
-  if(t<=pts[0].min) return pts[0].qty;
-  if(t>=pts[pts.length-1].min) return pts[pts.length-1].qty;
-  for(let i=1;i<pts.length;i++){ if(t<=pts[i].min){ const a=pts[i-1],b=pts[i]; return a.qty+(b.qty-a.qty)*((t-a.min)/(b.min-a.min)); } }
+  if(t<=pts[0].t) return pts[0].qty;
+  if(t>=pts[pts.length-1].t) return pts[pts.length-1].qty;
+  for(let i=1;i<pts.length;i++){ if(t<=pts[i].t){ const a=pts[i-1],b=pts[i];
+    return a.qty+(b.qty-a.qty)*((t-a.t)/(b.t-a.t)); } }
   return pts[pts.length-1].qty;
 }
-const dayFinal=pts=>pts.length?Math.max(...pts.map(p=>p.qty)):0;
+const finalOf=pts=>pts.length?Math.max(...pts.map(p=>p.qty)):0;
 const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
 const std=a=>a.length<2?0:Math.sqrt(mean(a.map(x=>(x-mean(a))**2)));
 
 function buildModel(history){
-  const days=history.filter(d=>dayFinal(d.points)>0 && d.points.length>=3);
-  const finals=days.map(d=>dayFinal(d.points));
-  const fbar=t=> days.length?mean(days.map(d=>qtyAt(d.points,t)/dayFinal(d.points))):0;
-  const fsig=t=> days.length?std(days.map(d=>qtyAt(d.points,t)/dayFinal(d.points))):0;
-  return {days, histFinal:days.length?mean(finals):0, histFinalStd:days.length?std(finals):0, fbar, fsig};
+  const days=history.filter(d=>finalOf(d.points)>0 && d.points.length>=3);
+  const finals=days.map(d=>finalOf(d.points));
+  return {
+    days,
+    histFinal:    days.length?mean(finals):0,
+    histFinalStd: days.length?std(finals):0,
+    fbar: t=> days.length?mean(days.map(d=>qtyAt(d.points,t)/finalOf(d.points))):0,
+    fsig: t=> days.length?std (days.map(d=>qtyAt(d.points,t)/finalOf(d.points))):0,
+  };
 }
 function predict(model, targetPoints, T){
   if(model.days.length===0) return {ok:false};
-  const before=(targetPoints||[]).filter(p=>p.min<=T).sort((a,b)=>a.min-b.min);
+  const before=(targetPoints||[]).filter(p=>p.t<=T).sort((a,b)=>a.t-b.t);
   let estFinal, calibrated=false, anchor=null;
-  if(before.length){ anchor=before[before.length-1]; const fa=model.fbar(anchor.min);
-    if(fa>0.1){ estFinal=anchor.qty/fa; calibrated=true; } else estFinal=model.histFinal; }
-  else estFinal=model.histFinal;
+  if(before.length){
+    anchor=before[before.length-1];
+    const fa=model.fbar(anchor.t);
+    if(fa>0.1){ estFinal=anchor.qty/fa; calibrated=true; } else estFinal=model.histFinal;
+  } else estFinal=model.histFinal;
   const fT=model.fbar(T), sT=model.fsig(T);
   const pred=estFinal*fT;
   let band=estFinal*sT + (calibrated?0:model.histFinalStd*fT);
   band=Math.max(band, pred*0.03);
-  return {ok:true, pred:Math.round(pred), band:Math.round(band), lo:Math.max(0,Math.round(pred-band)), hi:Math.round(pred+band),
+  return {ok:true, pred:Math.round(pred), band:Math.round(band),
+          lo:Math.max(0,Math.round(pred-band)), hi:Math.round(pred+band),
           estFinal:Math.round(estFinal), calibrated, anchor, daysUsed:model.days.length};
 }
 
-/* ---- 初始化 ---- */
+/* ---------- 初始化 ---------- */
 function init(){
   if(SUPABASE_URL.includes("你的项目")||SUPABASE_ANON_KEY.includes("在此")){ $("#setup").style.display="block"; return; }
   $("#app").style.display="block";
   sb=supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  $("#datePick").value=todayStr();
   $("#predictBtn").onclick=doPredict;
-  loadWarehouses().then(()=>{ setConn(true,"已连接"); doPredict(); }).catch(e=>setConn(false,"连接失败："+(e.message||e)));
+  Promise.all([loadWarehouses(), loadBatches()])
+    .then(()=>{ setConn(true,"已连接"); doPredict(); })
+    .catch(e=>setConn(false,"连接失败："+(e.message||e)));
 }
 function setConn(ok,t){ $("#connDot").className="dot "+(ok?"ok":"err"); $("#connText").textContent=t; }
 
 async function loadWarehouses(){
-  const { data, error } = await sb.from("warehouse_list")
-    .select("warehouse_id,warehouse_name").limit(500);
+  const { data, error } = await sb.from("warehouse_list").select("warehouse_id,warehouse_name").limit(500);
   if(error) throw error;
-  const map=new Map(); (data||[]).forEach(r=>map.set(r.warehouse_id, r.warehouse_name||String(r.warehouse_id)));
-  const arr=[...map.entries()].map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
+  const arr=(data||[]).map(r=>({id:r.warehouse_id, name:r.warehouse_name||String(r.warehouse_id)}))
+    .sort((a,b)=>a.name.localeCompare(b.name));
   const sel=$("#whSelect"); sel.innerHTML="";
   arr.forEach(w=>{ const o=document.createElement("option"); o.value=w.id; o.textContent=`${w.name} (${w.id})`; sel.appendChild(o); });
 }
 
-async function fetchDays(whId, dateStr, n){
-  const {startISO,endISO}=rangeISO(dateStr,n);
-  let all=[],from=0,page=1000;
+async function loadBatches(){
+  const { data, error } = await sb.from("warehouse_batches")
+    .select("batch").order("batch",{ascending:false}).limit(200);
+  if(error) throw error;
+  state.batches=(data||[]).map(r=>r.batch).filter(b=>batchStart(b)!=null);  // 单号自带时间戳，倒序即最新在前
+  const sel=$("#batchSelect"); sel.innerHTML="";
+  state.batches.forEach(b=>{ const o=document.createElement("option"); o.value=b; o.textContent=batchLabel(b); sel.appendChild(o); });
+}
+
+/* 取若干批次的数据 → Map(batch → [{t,qty}])，t 是距该批开始的分钟数 */
+async function fetchBatches(whId, batches){
+  let all=[], from=0, page=1000;
   while(true){
-    const { data, error } = await sb.from("warehouse_snapshots").select("captured_at,qty")
-      .eq("warehouse_id",whId).gte("captured_at",startISO).lt("captured_at",endISO)
-      .order("captured_at",{ascending:true}).range(from,from+page-1);
+    const { data, error } = await sb.from("warehouse_snapshots")
+      .select("batch_no,captured_at,qty")
+      .eq("warehouse_id", whId).in("batch_no", batches)
+      .order("captured_at",{ascending:true}).range(from, from+page-1);
     if(error) throw error;
     all=all.concat(data||[]);
-    if(!data||data.length<page) break; from+=page;
+    if(!data || data.length<page) break;
+    from+=page;
   }
-  const byDate=new Map();
-  for(const r of all){ const {date,min}=nyParts(new Date(r.captured_at));
-    if(!byDate.has(date)) byDate.set(date,[]); byDate.get(date).push({min,qty:r.qty}); }
-  for(const pts of byDate.values()) pts.sort((a,b)=>a.min-b.min);
-  return byDate;
+  const byBatch=new Map();
+  for(const r of all){
+    const st=batchStart(r.batch_no); if(st==null) continue;
+    if(!byBatch.has(r.batch_no)) byBatch.set(r.batch_no,[]);
+    byBatch.get(r.batch_no).push({ t:elapsedMin(r.captured_at, st), qty:r.qty });
+  }
+  for(const pts of byBatch.values()) pts.sort((a,b)=>a.t-b.t);
+  return byBatch;
 }
 
 async function doPredict(){
   const whId=Number($("#whSelect").value);
-  const dateStr=$("#datePick").value;
-  const n=Math.max(2,Number($("#nDays").value)||10);
-  const [th,tm]=$("#timePick").value.split(":").map(Number);
-  const T=th*60+tm;
-  if(!whId||!dateStr) return;
+  const target=$("#batchSelect").value;
+  const n=Math.max(2, Number($("#nDays").value)||10);
+  if(!whId || !target) return;
+  const T=targetT(target, $("#timePick").value);
+  if(T==null) return;
+
   setConn(true,"计算中…");
   try{
-    const byDate=await fetchDays(whId,dateStr,n);
-    const targetPoints=byDate.get(dateStr)||[];
-    const histDates=[...byDate.keys()].filter(d=>d<dateStr).sort().slice(-n);
-    const history=histDates.map(d=>({date:d,points:byDate.get(d)}));
+    const i=state.batches.indexOf(target);
+    const hist=state.batches.slice(i+1, i+1+n);          // 更早的 n 个批次
+    const byBatch=await fetchBatches(whId, [target, ...hist]);
+    const targetPoints=byBatch.get(target)||[];
+    const history=hist.map(b=>({batch:b, points:byBatch.get(b)||[]})).filter(h=>h.points.length);
     const model=buildModel(history);
-    const res=predict(model,targetPoints,T);
-    renderResult(res,targetPoints,T,dateStr);
-    renderChart(model,history,targetPoints,res,T);
+    const res=predict(model, targetPoints, T);
+    renderResult(res, targetPoints, T, target);
+    renderChart(model, history, targetPoints, res, T, target);
     setConn(true,"已连接");
   }catch(e){ console.error(e); setConn(false,"出错："+(e.message||e)); }
 }
 
-function renderResult(res,targetPoints,T,dateStr){
-  const box=$("#result");
-  if(!res.ok){ box.innerHTML=`<div class="rcard"><div class="accentbar"></div><div class="lab">预测</div><div class="empty" style="padding:10px 0">历史数据不足，先多攒几天再来。至少要有 2 天、建议 7–10 天。</div></div>`; return; }
-  const actual = targetPoints.length ? qtyAt(targetPoints, T) : null;
-  const actualShown = (targetPoints.length && targetPoints[targetPoints.length-1].min>=T) ? Math.round(actual) : null;
-  const warn = res.daysUsed<7 ? `<div class="sub" style="color:var(--orange)">⚠ 只用了 ${res.daysUsed} 天历史，精度有限，攒够 7–10 天更稳。</div>` : "";
+function renderResult(res, targetPoints, T, batch){
+  const box=$("#result"); const start=batchStart(batch); const sd=stockDay(batch);
+  if(!res.ok){
+    box.innerHTML=`<div class="rcard"><div class="accentbar"></div><div class="lab">预测</div>
+      <div class="empty" style="padding:10px 0">历史批次不足，先多攒几天。至少 2 个，建议 7–10 个。</div></div>`;
+    return;
+  }
+  const last = targetPoints.length ? targetPoints[targetPoints.length-1] : null;
+  const actual = (last && last.t>=T) ? Math.round(qtyAt(targetPoints,T)) : null;
+  const warn = res.daysUsed<7 ? `<div class="sub" style="color:var(--orange)">⚠ 只用了 ${res.daysUsed} 个历史批次，精度有限，攒够 7–10 个更稳。</div>` : "";
   box.innerHTML=`
     <div class="rcard"><div class="accentbar"></div>
-      <div class="lab">${dateStr} · ${hhmm(T)} 预测货量</div>
+      <div class="lab">${sd?sd.str:""} 备货 · ${hhmmOf(T,start)} 预测货量</div>
       <div class="big num">${res.pred.toLocaleString()}</div>
       <div class="rng">± ${res.band}　( ${res.lo} – ${res.hi} )</div>
       ${warn}
     </div>
     <div class="rcard"><div class="accentbar" style="background:var(--blue)"></div>
-      <div class="lab">估计当天最终货量</div>
+      <div class="lab">估计这批最终货量</div>
       <div class="mid num">${res.estFinal.toLocaleString()}</div>
       <div class="sub">${res.calibrated
-        ? `已用当天 ${hhmm(res.anchor.min)} 的实测 ${res.anchor.qty} 校准`
-        : `当天 ${hhmm(T)} 前无数据，用历史平均`}</div>
+        ? `已用本批 ${hhmmOf(res.anchor.t,start)} 的实测 ${res.anchor.qty} 校准`
+        : `本批 ${hhmmOf(T,start)} 前还没数据，用历史平均`}</div>
     </div>
     <div class="rcard"><div class="accentbar" style="background:var(--green)"></div>
-      <div class="lab">${actualShown!=null?"当天实际（已抓到）":"参考"}</div>
-      <div class="mid num">${actualShown!=null?actualShown.toLocaleString():"—"}</div>
-      <div class="sub">${actualShown!=null
-        ? `预测误差 ${Math.abs(res.pred-actualShown)}（${(Math.abs(res.pred-actualShown)/Math.max(1,actualShown)*100).toFixed(1)}%）`
-        : `训练用了 ${res.daysUsed} 天历史`}</div>
+      <div class="lab">${actual!=null?"实际（已抓到）":"参考"}</div>
+      <div class="mid num">${actual!=null?actual.toLocaleString():"—"}</div>
+      <div class="sub">${actual!=null
+        ? `预测误差 ${Math.abs(res.pred-actual)}（${(Math.abs(res.pred-actual)/Math.max(1,actual)*100).toFixed(1)}%）`
+        : `训练用了 ${res.daysUsed} 个历史批次`}</div>
     </div>`;
 }
 
-function renderChart(model,history,targetPoints,res,T){
-  const mins=[]; history.forEach(d=>d.points.forEach(p=>mins.push(p.min))); targetPoints.forEach(p=>mins.push(p.min));
-  let lo=mins.length?Math.min(...mins):300, hi=mins.length?Math.max(...mins):1140;
-  hi=Math.max(hi,T); lo=Math.min(lo,T);
-  const grid=[]; for(let t=Math.floor(lo/20)*20;t<=Math.ceil(hi/20)*20;t+=20) grid.push(t);
-  const labels=grid.map(hhmm);
-  const ds=[];
-  // 历史各天（灰）
-  history.forEach(d=>{ const f=d.points[0].min,l=d.points[d.points.length-1].min;
-    ds.push({label:d.date,data:grid.map(t=>(t>=f&&t<=l)?Math.round(qtyAt(d.points,t)):null),
-      borderColor:"rgba(131,131,141,.28)",borderWidth:1,pointRadius:0,tension:.25,spanGaps:false}); });
-  // 预测区间带
-  if(res.ok){
-    ds.push({label:"上界",data:grid.map(t=>Math.round(res.estFinal*(model.fbar(t)+model.fsig(t)))),
-      borderColor:"transparent",backgroundColor:"rgba(236,139,60,.10)",pointRadius:0,fill:"+1",tension:.3,order:5});
-    ds.push({label:"下界",data:grid.map(t=>Math.round(res.estFinal*Math.max(0,model.fbar(t)-model.fsig(t)))),
-      borderColor:"transparent",pointRadius:0,fill:false,tension:.3,order:5});
-    // 预测曲线（橙虚线）
-    ds.push({label:"预测曲线",data:grid.map(t=>Math.round(res.estFinal*model.fbar(t))),
-      borderColor:"#ec8b3c",borderDash:[6,4],borderWidth:2,pointRadius:0,tension:.3,order:2});
-  }
-  // 当天实测（绿）
-  if(targetPoints.length){ const l=targetPoints[targetPoints.length-1].min;
-    ds.push({label:"当天实测",data:grid.map(t=>t<=l?Math.round(qtyAt(targetPoints,t)):null),
-      borderColor:"#5bb98c",borderWidth:2.5,pointRadius:2,tension:.25,spanGaps:false,order:1}); }
-  // 预测点
-  if(res.ok){ ds.push({label:`预测 ${hhmm(T)}`,data:grid.map(t=>t===grid.find(g=>g>=T)?res.pred:null),
-    borderColor:"#ec8b3c",backgroundColor:"#ec8b3c",pointRadius:6,pointHoverRadius:7,showLine:false,order:0}); }
+function renderChart(model, history, targetPoints, res, T, batch){
+  const start=batchStart(batch);
+  const ts=[]; history.forEach(h=>h.points.forEach(p=>ts.push(p.t))); targetPoints.forEach(p=>ts.push(p.t));
+  let lo=ts.length?Math.min(...ts):0, hi=ts.length?Math.max(...ts):1200;
+  hi=Math.max(hi,T); lo=Math.min(lo,0);
+  const grid=[]; for(let t=Math.floor(lo/20)*20; t<=Math.ceil(hi/20)*20; t+=20) grid.push(t);
 
-  const cfg={type:"line",data:{labels,datasets:ds},options:{
-    responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
-    plugins:{legend:{labels:{color:"#83838d",font:{family:"Space Grotesk"},filter:i=>!["上界","下界"].includes(i.text)&&!/^\d{4}-/.test(i.text)}},
-      tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3",
+  // 横轴标签：真实钟点，跨夜那点带上日期
+  let prevDate=null;
+  const labels=grid.map(t=>{ const s=nyStamp(start+t*60000);
+    const lab=(prevDate && s.date!==prevDate) ? `${s.date.slice(5)} ${s.hm}` : s.hm;
+    prevDate=s.date; return lab; });
+
+  const ds=[];
+  history.forEach(h=>{ const f=h.points[0].t, l=h.points[h.points.length-1].t;
+    ds.push({label:h.batch, data:grid.map(t=>(t>=f&&t<=l)?Math.round(qtyAt(h.points,t)):null),
+      borderColor:"rgba(131,131,141,.28)", borderWidth:1, pointRadius:0, tension:.25, spanGaps:false}); });
+  if(res.ok){
+    ds.push({label:"上界", data:grid.map(t=>Math.round(res.estFinal*(model.fbar(t)+model.fsig(t)))),
+      borderColor:"transparent", backgroundColor:"rgba(236,139,60,.10)", pointRadius:0, fill:"+1", tension:.3, order:5});
+    ds.push({label:"下界", data:grid.map(t=>Math.round(res.estFinal*Math.max(0,model.fbar(t)-model.fsig(t)))),
+      borderColor:"transparent", pointRadius:0, fill:false, tension:.3, order:5});
+    ds.push({label:"预测曲线", data:grid.map(t=>Math.round(res.estFinal*model.fbar(t))),
+      borderColor:"#ec8b3c", borderDash:[6,4], borderWidth:2, pointRadius:0, tension:.3, order:2});
+  }
+  if(targetPoints.length){ const l=targetPoints[targetPoints.length-1].t;
+    ds.push({label:"本批实测", data:grid.map(t=>t<=l?Math.round(qtyAt(targetPoints,t)):null),
+      borderColor:"#5bb98c", borderWidth:2.5, pointRadius:2, tension:.25, spanGaps:false, order:1}); }
+  if(res.ok){ const gT=grid.find(g=>g>=T);
+    ds.push({label:`预测 ${hhmmOf(T,start)}`, data:grid.map(t=>t===gT?res.pred:null),
+      borderColor:"#ec8b3c", backgroundColor:"#ec8b3c", pointRadius:6, pointHoverRadius:7, showLine:false, order:0}); }
+
+  const cfg={type:"line", data:{labels, datasets:ds}, options:{
+    responsive:true, maintainAspectRatio:false, interaction:{mode:"index", intersect:false},
+    plugins:{
+      legend:{labels:{color:"#83838d", font:{family:"Space Grotesk"},
+        filter:i=>!["上界","下界"].includes(i.text) && !/^NJSUB-/.test(i.text)}},
+      tooltip:{backgroundColor:"#1b1b22", borderColor:"#2a2a32", borderWidth:1, titleColor:"#ece9e3", bodyColor:"#ece9e3",
         filter:i=>!["上界","下界"].includes(i.dataset.label)}},
-    scales:{x:{ticks:{color:"#5b5b64",maxRotation:0,autoSkip:true,maxTicksLimit:12,font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"}},
-      y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:true}}}};
+    scales:{
+      x:{ticks:{color:"#5b5b64", maxRotation:0, autoSkip:true, maxTicksLimit:12, font:{family:"JetBrains Mono"}}, grid:{color:"#1c1c22"}},
+      y:{ticks:{color:"#5b5b64", font:{family:"JetBrains Mono"}}, grid:{color:"#1c1c22"}, beginAtZero:true}}}};
   if(chart) chart.destroy();
-  chart=new Chart($("#chart"),cfg);
-  $("#chartSub").textContent=`灰=历史各天 · 橙虚线=预测 · 绿=当天实测 · 纽约时间`;
+  chart=new Chart($("#chart"), cfg);
+  $("#chartSub").textContent="灰=历史批次 · 橙虚线=预测 · 绿=本批实测 · 纽约时间";
+  if(!history.length && !targetPoints.length){
+    $("#chartBox").innerHTML=`<div class="empty"><div class="big">这个仓库暂无数据</div>换个仓库或批次试试。</div>`;
+    chart=null;
+  }
 }
 
 init();
