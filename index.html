@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   /* 配色令牌与导航栏在 shared.css 中统一定义 */
   *{box-sizing:border-box}
@@ -137,6 +138,19 @@
   .tplbar .btn.tpl:hover{background:var(--orange);color:#1a1205;border-color:var(--orange)}
   .tplbar .btn.tpl:disabled{opacity:.4;cursor:not-allowed}
   .tplbar .tplmeta{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .tplbar .tpllab{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .tplbar .tplsp{flex:1 1 auto}
+  .tplsel{background:var(--raised);border:1px solid var(--line);color:var(--ink);border-radius:8px;
+    padding:7px 10px;font-size:12.5px;font-family:var(--sans);min-width:190px;max-width:260px}
+  .tplsel:focus{outline:none;border-color:var(--orange)}
+  .tplbar .btn.tpl.mini{padding:7px 10px;font-size:12px}
+  .tplbar .btn.tpl.danger{border-color:var(--line);color:var(--muted)}
+  .tplbar .btn.tpl.danger:hover{background:var(--red);border-color:var(--red);color:#fff}
+  .tplsave{display:flex;gap:8px;align-items:center;margin:-6px 0 12px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:9px;background:var(--raised)}
+  .tplsave input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--sans)}
+  .tplsave input:focus{outline:none;border-color:var(--orange)}
 
   /* ---- export sheet ---- */
   .sheet{margin-top:22px;border:1px solid var(--line-soft);border-radius:12px;background:var(--panel);
@@ -216,9 +230,20 @@
     <section class="panel">
       <div class="phead"><span class="step">2</span><h2>今日计划</h2><span class="hint" id="planHint">0 条</span></div>
       <div class="pbody" style="padding:14px 14px 4px">
-        <div class="tplbar" id="tplBar" style="display:none">
-          <button class="btn tpl" id="templateBtn" disabled>⚡ 套用模板生成</button>
+        <div class="tplbar" id="tplBar">
+          <span class="tpllab">模板</span>
+          <select id="tplSelect" class="tplsel"><option value="">（加载中…）</option></select>
+          <button class="btn tpl" id="templateBtn" disabled>⚡ 套用</button>
+          <span class="tplsp"></span>
+          <button class="btn tpl mini" id="tplSaveAs">另存为…</button>
+          <button class="btn tpl mini" id="tplUpdate" disabled>更新</button>
+          <button class="btn tpl mini danger" id="tplDelete" disabled>删除</button>
           <span class="tplmeta" id="tplMeta"></span>
+        </div>
+        <div class="tplsave" id="tplSaveBar" style="display:none">
+          <input type="text" id="tplName" placeholder="模板名称，如：常规日 / 大促日 / 周末" />
+          <button class="btn tpl" id="tplSaveOk">保存</button>
+          <button class="btn tpl mini" id="tplSaveCancel">取消</button>
         </div>
         <div class="mlist" id="mlist">
           <div class="empty"><div class="big">计划是空的</div>从左边点 + 把路线加进来</div>
@@ -612,39 +637,178 @@ enableDragSort();
 
 renderPlan();
 
-// ---- 模板：一键生成今日计划 ----
-let TEMPLATE = [];
+/* ============================================================
+   模板：存在 Supabase 的 plan_templates 表，可存多个命名模板
+   items = [{route, trucks, palletPerTruck}, ...]
+   进页面自动选中「上次用过的」（靠 last_used_at 排序，换设备也一样）
+   Supabase 不可用时，退回本地 template.json
+   ============================================================ */
+const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
+
+let sb = null;
+let TEMPLATES = [];          // Supabase 里的模板列表
+let TEMPLATE  = [];          // 本地 template.json 的兜底模板
+const $t = id => document.getElementById(id);
+
+/* 本地 template.json（兜底） */
 function initTemplate(input){
-  // 接受数组 / {data:[...]} / const PLAN 文本
   let arr = Array.isArray(input) ? input
     : (input && Array.isArray(input.data) ? input.data
     : (typeof input === "string" ? parsePlanish(input) : null));
   if(!arr) throw new Error("template 需为数组或 const PLAN 文本");
   TEMPLATE = arr.filter(o=>o && o.route).map(o=>({
-    route: o.route,
-    trucks: o.trucks ?? 1,
+    route: o.route, trucks: o.trucks ?? 1,
     palletPerTruck: (o.palletPerTruck ?? o.pallet ?? "")
   }));
   refreshTemplateUI();
 }
-function refreshTemplateUI(){
-  const bar = document.getElementById("tplBar");
-  const btn = document.getElementById("templateBtn");
-  if(!TEMPLATE.length){ bar.style.display = "none"; return; }
-  bar.style.display = "flex";
-  btn.disabled = false;
-  document.getElementById("tplMeta").textContent = `${TEMPLATE.length} 条模板路线`;
+
+/* 当前计划 → items 数组 */
+function planToItems(){
+  return [...plan.entries()].map(([route,v])=>({
+    route, trucks: Number(v.trucks)||0, palletPerTruck: Number(v.palletPerTruck)||0
+  }));
 }
-function applyTemplate(){
-  if(!TEMPLATE.length) return;
-  if(plan.size && !confirm(`用模板覆盖当前计划？现有 ${plan.size} 条将被替换。`)) return;
+/* items → 覆盖当前计划 */
+function itemsToPlan(items){
   plan.clear();
-  TEMPLATE.forEach(t=> plan.set(t.route, { trucks:t.trucks, palletPerTruck:t.palletPerTruck }));
+  (items||[]).forEach(t=>{ if(t && t.route) plan.set(t.route, {
+    trucks: t.trucks ?? 1, palletPerTruck: t.palletPerTruck ?? "" }); });
   renderPlan(); renderRoutes();
-  document.getElementById("sheet").classList.remove("show");
-  toast(`已套用模板：${plan.size} 条，可继续拖动 / 修改`);
+  $t("sheet").classList.remove("show");
 }
-document.getElementById("templateBtn").onclick = applyTemplate;
+
+/* ---- Supabase ---- */
+async function loadTemplates(){
+  if(!sb) return;
+  const { data, error } = await sb.from("plan_templates")
+    .select("id,name,items,last_used_at,updated_at")
+    .order("last_used_at",{ascending:false, nullsFirst:false})
+    .order("updated_at",{ascending:false});
+  if(error) throw error;
+  TEMPLATES = data || [];
+  renderTplOptions();
+}
+function renderTplOptions(keepId){
+  const sel = $t("tplSelect");
+  const want = keepId ?? sel.value;
+  sel.innerHTML = "";
+  if(!TEMPLATES.length){
+    const o=document.createElement("option"); o.value=""; o.textContent="（还没有模板，先「另存为」）";
+    sel.appendChild(o);
+  }else{
+    TEMPLATES.forEach(t=>{
+      const o=document.createElement("option"); o.value=String(t.id);
+      o.textContent = `${t.name}（${(t.items||[]).length}条）`;
+      sel.appendChild(o);
+    });
+    // 默认选中：上次用过的（列表已按 last_used_at 倒序）
+    sel.value = (want && TEMPLATES.some(t=>String(t.id)===String(want))) ? String(want) : String(TEMPLATES[0].id);
+  }
+  refreshTemplateUI();
+}
+function currentTpl(){ return TEMPLATES.find(t=>String(t.id)===$t("tplSelect").value) || null; }
+
+function refreshTemplateUI(){
+  const t = currentTpl();
+  const hasSb = !!TEMPLATES.length;
+  $t("templateBtn").disabled = !(t || TEMPLATE.length);
+  $t("tplUpdate").disabled   = !t;
+  $t("tplDelete").disabled   = !t;
+  const meta = t ? `${(t.items||[]).length} 条`
+             : (TEMPLATE.length ? `本地 template.json（${TEMPLATE.length} 条）` : "");
+  $t("tplMeta").textContent = meta;
+}
+
+/* 套用（并把它标成"上次用过的"） */
+async function applyTemplate(){
+  const t = currentTpl();
+  const items = t ? (t.items||[]) : TEMPLATE;
+  if(!items.length) return;
+  if(plan.size && !confirm(`用模板覆盖当前计划？现有 ${plan.size} 条将被替换。`)) return;
+  itemsToPlan(items);
+  toast(`已套用：${t? t.name : "本地模板"}（${plan.size} 条）`);
+  if(t && sb){
+    try{ await sb.from("plan_templates").update({last_used_at:new Date().toISOString()}).eq("id",t.id); }
+    catch(e){ console.warn("记录 last_used_at 失败", e); }
+  }
+}
+
+/* 另存为新模板 */
+function showSaveBar(){
+  if(!plan.size){ toast("当前计划是空的，先加几条路线"); return; }
+  $t("tplSaveBar").style.display="flex";
+  const t=currentTpl();
+  $t("tplName").value = t ? t.name + " 副本" : "";
+  $t("tplName").focus();
+}
+async function saveAsTemplate(){
+  const name = $t("tplName").value.trim();
+  if(!name){ toast("给模板起个名字"); return; }
+  if(!sb){ toast("没连上 Supabase，无法保存"); return; }
+  try{
+    const { data, error } = await sb.from("plan_templates")
+      .insert({ name, items: planToItems(), last_used_at:new Date().toISOString() })
+      .select("id").single();
+    if(error) throw error;
+    $t("tplSaveBar").style.display="none";
+    await loadTemplates();
+    renderTplOptions(data.id);
+    toast(`已保存模板「${name}」（${plan.size} 条）`);
+  }catch(e){
+    toast(e.message && e.message.includes("duplicate") ? "这个名字已存在，换一个" : "保存失败："+(e.message||e));
+  }
+}
+
+/* 用当前计划覆盖选中的模板 */
+async function updateTemplate(){
+  const t = currentTpl(); if(!t || !sb) return;
+  if(!plan.size){ toast("当前计划是空的"); return; }
+  if(!confirm(`用当前计划（${plan.size} 条）覆盖模板「${t.name}」？`)) return;
+  try{
+    const { error } = await sb.from("plan_templates")
+      .update({ items: planToItems(), updated_at:new Date().toISOString(), last_used_at:new Date().toISOString() })
+      .eq("id", t.id);
+    if(error) throw error;
+    await loadTemplates(); renderTplOptions(t.id);
+    toast(`模板「${t.name}」已更新（${plan.size} 条）`);
+  }catch(e){ toast("更新失败："+(e.message||e)); }
+}
+
+async function deleteTemplate(){
+  const t = currentTpl(); if(!t || !sb) return;
+  if(!confirm(`删除模板「${t.name}」？不可恢复。`)) return;
+  try{
+    const { error } = await sb.from("plan_templates").delete().eq("id", t.id);
+    if(error) throw error;
+    await loadTemplates(); renderTplOptions();
+    toast(`已删除「${t.name}」`);
+  }catch(e){ toast("删除失败："+(e.message||e)); }
+}
+
+/* 绑定 */
+$t("templateBtn").onclick   = applyTemplate;
+$t("tplSelect").onchange    = refreshTemplateUI;
+$t("tplSaveAs").onclick     = showSaveBar;
+$t("tplSaveOk").onclick     = saveAsTemplate;
+$t("tplSaveCancel").onclick = ()=>{ $t("tplSaveBar").style.display="none"; };
+$t("tplName").onkeydown     = e=>{ if(e.key==="Enter") saveAsTemplate(); if(e.key==="Escape") $t("tplSaveBar").style.display="none"; };
+$t("tplUpdate").onclick     = updateTemplate;
+$t("tplDelete").onclick     = deleteTemplate;
+
+/* 启动：连 Supabase 拉模板 */
+async function initSupabaseTemplates(){
+  if(SUPABASE_URL.includes("你的项目")) { refreshTemplateUI(); return; }
+  try{
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    await loadTemplates();
+  }catch(e){
+    console.warn("Supabase 模板加载失败，退回本地 template.json：", e);
+    $t("tplSelect").innerHTML = '<option value="">（连不上 Supabase）</option>';
+    refreshTemplateUI();
+  }
+}
 
 // ---- 加载 json（兼容 http 服务器 / 本地双击）----
 // routes.json（必需）, warehouses.json（仓库+货量）, warehouse_routes.json（对应关系）, template.json（模板）
@@ -691,6 +855,8 @@ function showFallback(missing){
     });
   });
 }
+
+initSupabaseTemplates();
 
 function loadAll(){
   Promise.allSettled(FILES.map(f =>
