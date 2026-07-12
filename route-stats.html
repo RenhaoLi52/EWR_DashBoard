@@ -159,6 +159,13 @@
         <button data-g="1h">1小时</button>
       </div>
     </div>
+    <div class="fld">
+      <label>显示</label>
+      <div class="seg" id="modeSeg">
+        <button data-m="cum" class="active">累计</button>
+        <button data-m="delta">增量</button>
+      </div>
+    </div>
     <div class="spacer"></div>
     <button class="btn" id="resetZoom">重置缩放</button>
     <button class="btn" id="refreshBtn">刷新</button>
@@ -223,10 +230,11 @@
 </div>
 
 <script>
+fetch("nav.html").then(r=>r.text()).then(h=>{document.getElementById("nav-slot").innerHTML=h;});
+
 /* =====================================================================
    Supabase 连接信息（SUPABASE_ANON_KEY 填 Publishable key sb_publishable_…）
    ===================================================================== */
-fetch("nav.html").then(r=>r.text()).then(h=>{document.getElementById("nav-slot").innerHTML=h;});
 const SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
 /* ===================================================================== */
@@ -245,7 +253,7 @@ const SOURCES = {
 
 const state = {
   sb:null, source:"route", templates:[], selected:new Set(), metric:"order_count",
-  batch:null, batches:[], gran:"20m",
+  batch:null, batches:[], gran:"20m", mode:"cum",
   byTs:new Map(), tsList:[], allEntities:[], entityName:new Map(), editingId:null, chart:null,
 };
 const $ = s => document.querySelector(s);
@@ -340,6 +348,19 @@ function visibleTs(){
   if(state.gran==="1h") return state.tsList.filter(ts=>nyMinute(ts)%60===0);
   return state.tsList;
 }
+
+/* 一条序列在这些时间点上的取值。
+   累计(cum)  ：直接取值
+   增量(delta)：本点 − 上一点（相对的是"粒度筛选之后"的上一点，
+                所以切到1小时就是每小时增量，切到20分钟就是每20分钟增量）
+   第一个点没有上一点 → 增量记为 null（图上不画，表里显示 —） */
+function seriesValues(ids, tsList){
+  const cum = tsList.map(ts=>seriesSumAt(ids, ts));
+  if(state.mode!=="delta") return cum;
+  return cum.map((v,i)=> i===0 ? null : v - cum[i-1]);
+}
+const isDelta = ()=> state.mode==="delta";
+const modeLabel = ()=> isDelta() ? (state.gran==="1h" ? "每小时增量" : "每20分钟增量") : "累计";
 // 图表标签：跨夜时在换日那点加上日期
 function tsLabels(list){
   let prev=null;
@@ -405,7 +426,7 @@ function selectedMemberIds(){
 function renderAll(){
   renderCards(); renderChart(); renderTable();
   const sd=state.batch?batchStockDate(state.batch):null;
-  $("#chartSub").textContent=`${sd?sd+" 备货 · ":""}${state.batch||"—"} · ${metricLabel()} · 纽约时间`;
+  $("#chartSub").textContent=`${sd?sd+" 备货 · ":""}${state.batch||"—"} · ${metricLabel()} · ${modeLabel()} · 纽约时间`;
   $("#tableTitle").textContent=src().tableTitle;
 }
 
@@ -450,18 +471,26 @@ function renderChips(){
 function renderCards(){
   const box=$("#summaryCards"); const series=plotSeries();
   if(series.length===0){ box.innerHTML=""; return; }
-  const ts=state.tsList, latest=ts[ts.length-1], prev=ts[ts.length-2];
+  const ts=visibleTs();                       // 跟着粒度走
+  const latest=ts[ts.length-1];
   box.innerHTML="";
   series.forEach(s=>{
-    const cur=latest?seriesSumAt(s.ids,latest):0;
-    const pre=prev?seriesSumAt(s.ids,prev):null;
-    let delta="",dcls="flat";
-    if(pre!==null){ const d=cur-pre; dcls=d>0?"up":d<0?"down":"flat"; delta=(d>0?"▲ +":d<0?"▼ ":"± ")+Math.abs(d); }
+    const vals=seriesValues(s.ids, ts);
+    const cur=vals.length?vals[vals.length-1]:null;
+    const pre=vals.length>1?vals[vals.length-2]:null;
+    const big = cur==null ? "—" : cur.toLocaleString();
+    let d="", dcls="flat";
+    if(cur!=null && pre!=null){ const diff=cur-pre; dcls=diff>0?"up":diff<0?"down":"flat";
+      d=(diff>0?"▲ +":diff<0?"▼ ":"± ")+Math.abs(diff); }
+    const sub = isDelta()
+      ? (cur!=null ? `本段进货` : "")
+      : (pre!=null ? `较上次` : "暂无上一次");
     const card=document.createElement("div"); card.className="card";
     card.innerHTML=`<div class="accentbar" style="background:${s.color}"></div>
-      <div class="name"><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.name)}</div>
-      <div class="big">${cur.toLocaleString()}</div>
-      <div class="meta">${pre!==null?`<span class="delta ${dcls}">${delta}</span><span>较上次</span>`:`<span>暂无上一次</span>`}
+      <div class="name"><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.name)}
+        ${isDelta()?`<span class="cnt" style="margin-left:auto;color:var(--faint);font-size:10.5px">${modeLabel()}</span>`:""}</div>
+      <div class="big">${big}</div>
+      <div class="meta">${d?`<span class="delta ${dcls}">${d}</span>`:""}<span>${sub}</span>
       ${latest?`<span style="margin-left:auto">${fmtTime(latest)}</span>`:""}</div>`;
     box.appendChild(card);
   });
@@ -470,44 +499,73 @@ function renderChart(){
   const series=plotSeries();
   const ts=visibleTs();
   const labels=tsLabels(ts);
-  const datasets=series.map(s=>({label:s.name,data:ts.map(t=>seriesSumAt(s.ids,t)),
-    borderColor:s.color,backgroundColor:s.color,tension:.25,pointRadius:2,pointHoverRadius:5,borderWidth:2}));
-  const cfg={type:"line",data:{labels,datasets},options:{
+  const delta=isDelta();
+  const datasets=series.map(s=>({
+    label:s.name, data:seriesValues(s.ids, ts),
+    borderColor:s.color, backgroundColor:s.color,
+    tension: delta?0:.25,                 // 增量是柱状/折线，不做平滑
+    pointRadius: delta?0:2, pointHoverRadius:5, borderWidth:2,
+    spanGaps:false,
+  }));
+  const cfg={type: delta?"bar":"line", data:{labels,datasets}, options:{
     responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
     plugins:{legend:{labels:{color:"#83838d",font:{family:"Space Grotesk"}}},
       tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3"},
       zoom:{ pan:{enabled:true,mode:"x"}, zoom:{wheel:{enabled:true},pinch:{enabled:true},drag:{enabled:false},mode:"x"} }},
     scales:{x:{ticks:{color:"#5b5b64",maxRotation:0,autoSkip:true,maxTicksLimit:14,font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"}},
-      y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:true}}}};
+      y:{ticks:{color:"#5b5b64",font:{family:"JetBrains Mono"}},grid:{color:"#1c1c22"},beginAtZero:!delta}}}};
   if(state.chart){ state.chart.destroy(); }
   state.chart=new Chart($("#chart"),cfg);
   if(state.tsList.length===0){ $("#chartBox").innerHTML=`<div class="empty"><div class="big">该批次暂无数据</div>换个单号，或确认抓取脚本在跑。</div>`; state.chart=null; }
 }
+/* 明细表里某个成员某个字段的值：
+   累计 → 最新一点的值；增量 → 最新一点 − 上一点（按当前粒度） */
+function memberVal(id, field, latest, prevTs){
+  const a=state.byTs.get(latest);       const ra=a?a.get(id):null;
+  const cur = ra ? (ra[field]||0) : 0;
+  if(!isDelta()) return cur;
+  if(!prevTs) return null;
+  const b=state.byTs.get(prevTs);       const rb=b?b.get(id):null;
+  return cur - (rb ? (rb[field]||0) : 0);
+}
+const fmtCell = v => v==null ? "—" : v.toLocaleString();
+
 function renderTable(){
-  const wrap=$("#tableWrap"); const series=plotSeries(); const latest=state.tsList[state.tsList.length-1];
+  const wrap=$("#tableWrap"); const series=plotSeries();
+  const ts=visibleTs();
+  const latest=ts[ts.length-1], prevTs=ts.length>1?ts[ts.length-2]:null;
   if(series.length===0){ wrap.innerHTML=`<div class="empty">选择上方的模板后显示明细。</div>`; $("#tableSub").textContent=""; return; }
   if(!latest){ wrap.innerHTML=`<div class="empty">该批次暂无数据。</div>`; $("#tableSub").textContent=""; return; }
-  $("#tableSub").textContent=fmtTime(latest);
+  $("#tableSub").textContent = isDelta()
+    ? (prevTs ? `${fmtTime(prevTs)} → ${fmtTime(latest)} 的增量` : fmtTime(latest))
+    : fmtTime(latest);
+
   const ids=selectedMemberIds();
-  const m=state.byTs.get(latest); const rows=[...ids].sort((a,b)=>a-b);
+  const rows=[...ids].sort((a,b)=>a-b);
+  const D=isDelta();
 
   if(state.source==="warehouse"){
     let tq=0,body="";
-    // 按货量从大到小排，方便看
-    const sorted=rows.map(id=>({id,r:m.get(id)})).sort((a,b)=>((b.r?b.r.qty:0)-(a.r?a.r.qty:0)));
-    for(const {id,r} of sorted){ const q=r?r.qty:0; tq+=q;
-      body+=`<tr><td>${escapeHtml(state.entityName.get(id)||id)}</td><td class="num">${q}</td></tr>`; }
-    wrap.innerHTML=`<table><thead><tr><th>仓库</th><th>货量</th></tr></thead>
+    const sorted=rows.map(id=>({id, v:memberVal(id,"qty",latest,prevTs)}))
+      .sort((a,b)=>((b.v??-1e9)-(a.v??-1e9)));       // 按值从大到小
+    for(const {id,v} of sorted){ if(v!=null) tq+=v;
+      body+=`<tr><td>${escapeHtml(state.entityName.get(id)||id)}</td><td class="num">${fmtCell(v)}</td></tr>`; }
+    wrap.innerHTML=`<table><thead><tr><th>仓库</th><th>${D?"货量增量":"货量"}</th></tr></thead>
       <tbody>${body}</tbody>
-      <tfoot><tr><td>合计 ${rows.length} 个仓</td><td class="num">${tq}</td></tr></tfoot></table>`;
+      <tfoot><tr><td>合计 ${rows.length} 个仓</td><td class="num">${fmtCell(prevTs||!D?tq:null)}</td></tr></tfoot></table>`;
   }else{
     let t0=0,t1=0,ta=0,body="";
-    for(const id of rows){ const r=m.get(id); const c0=r?r.count_type0:0,c1=r?r.count_type1:0,ca=r?r.order_count:0;
-      t0+=c0;t1+=c1;ta+=ca;
-      body+=`<tr><td class="num">${id}</td><td class="num">${ca}</td><td class="num">${c0}</td><td class="num">${c1}</td></tr>`; }
-    wrap.innerHTML=`<table><thead><tr><th>路线(司机ID)</th><th>总单量</th><th>类型0</th><th>类型1</th></tr></thead>
+    for(const id of rows){
+      const ca=memberVal(id,"order_count",latest,prevTs);
+      const c0=memberVal(id,"count_type0",latest,prevTs);
+      const c1=memberVal(id,"count_type1",latest,prevTs);
+      if(ca!=null){ ta+=ca; t0+=c0; t1+=c1; }
+      body+=`<tr><td class="num">${id}</td><td class="num">${fmtCell(ca)}</td><td class="num">${fmtCell(c0)}</td><td class="num">${fmtCell(c1)}</td></tr>`;
+    }
+    const ok = prevTs || !D;
+    wrap.innerHTML=`<table><thead><tr><th>路线(司机ID)</th><th>${D?"单量增量":"总单量"}</th><th>类型0</th><th>类型1</th></tr></thead>
       <tbody>${body}</tbody>
-      <tfoot><tr><td>合计 ${rows.length} 条</td><td class="num">${ta}</td><td class="num">${t0}</td><td class="num">${t1}</td></tr></tfoot></table>`;
+      <tfoot><tr><td>合计 ${rows.length} 条</td><td class="num">${fmtCell(ok?ta:null)}</td><td class="num">${fmtCell(ok?t0:null)}</td><td class="num">${fmtCell(ok?t1:null)}</td></tr></tfoot></table>`;
   }
 }
 
@@ -588,7 +646,11 @@ function bindEvents(){
   $("#batchSelect").onchange=e=>{ state.batch=e.target.value; loadBatch().catch(err=>setConn(false,err.message)); };
   $("#granSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
     $("#granSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active"); state.gran=b.dataset.g; renderChart();
+    b.classList.add("active"); state.gran=b.dataset.g; renderAll();
+  });
+  $("#modeSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    $("#modeSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); state.mode=b.dataset.m; renderAll();
   });
   $("#resetZoom").onclick=()=>{ if(state.chart&&state.chart.resetZoom) state.chart.resetZoom(); };
   $("#refreshBtn").onclick=()=>{ loadEntities().then(loadBatches).then(loadBatch).catch(err=>setConn(false,err.message)); };
