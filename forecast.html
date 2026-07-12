@@ -177,6 +177,64 @@ function targetT(batch, hhmm){
 }
 function hhmmOf(t,start){ return tLabel(t,start); }
 
+/* ============================================================
+   仓库特殊规则（按业务实际，只有这4个需要处理）
+   ------------------------------------------------------------
+   cutoff  19:00停机 → 19:00 的值就是终值，之后的点全部丢弃
+           SYR(71) / ALB(57)
+   reflow  19:00–21:00 之间会把货转入下一批(出货一次，时间不定)，
+           但之后仍继续进货到 21:00 停机。
+           → 把出掉的量加回来，让曲线恢复单调，21:00 才是终值
+           BOS(39) / RIC(52)
+   其余仓库：21:00 停机、单调递增，不处理。
+   ============================================================ */
+const WH_RULES = {
+  71: {type:"cutoff", at:"19:00"},   // SYR
+  57: {type:"cutoff", at:"19:00"},   // ALB
+  39: {type:"reflow", from:"19:00"}, // BOS
+  52: {type:"reflow", from:"19:00"}, // RIC
+};
+
+/* 把某仓库某批次的原始点列，按规则修正成"真实累计曲线" */
+function applyWarehouseRule(pts, whId, batch){
+  const rule = WH_RULES[whId];
+  if(!rule || !pts.length) return {pts, note:null};
+  const start = batchStart(batch);
+  const tAt = (hhmm)=>targetT(batch, hhmm);   // 备货日的钟点 → 相对分钟
+
+  if(rule.type==="cutoff"){
+    const T = tAt(rule.at);
+    const kept = pts.filter(p=>p.t<=T);
+    const dropped = pts.length - kept.length;
+    return { pts: kept,
+             note: dropped ? `${rule.at} 停机，已忽略之后 ${dropped} 个点` : null };
+  }
+
+  if(rule.type==="reflow"){
+    const T = tAt(rule.from);
+    let shipped = 0, events = [];
+    const fixed = pts.map((p,i)=>{
+      if(i>0 && p.t>T){
+        const drop = pts[i-1].qty - p.qty;      // 用"原始"前一点比，避免重复计
+        if(drop > 0){ shipped += drop; events.push({t:p.t, drop}); }
+      }
+      return { t:p.t, qty:p.qty + shipped };
+    });
+    const note = events.length
+      ? `${rule.from} 后转出 ${shipped} 件（${events.map(e=>hhmmOf(e.t,start)+" −"+e.drop).join("、")}），已加回`
+      : null;
+    return { pts: fixed, note };
+  }
+  return {pts, note:null};
+}
+
+/* 安全网：不在规则表里的仓库/路线如果出现下降，说明业务变了，要告警 */
+function detectDrop(pts){
+  for(let i=1;i<pts.length;i++) if(pts[i].qty < pts[i-1].qty)
+    return { at:pts[i].t, from:pts[i-1].qty, to:pts[i].qty };
+  return null;
+}
+
 /* ---------- 预测数学 ---------- */
 function qtyAt(pts,t){
   if(!pts.length) return null;
@@ -346,15 +404,28 @@ function buildSeries(rows, tpl, batches){
     m.get(ts).set(r[S.idField], r[S.metric]||0);
   }
   // 每个序列、每个批次 → 有序点列 [{t,qty}]
+  const isWh = S.kind==="warehouse";
   for(const se of series){
-    se.byBatch=new Map();
+    se.byBatch=new Map(); se.notes=[]; se.warns=[];
     for(const b of batches){
       const st=batchStart(b); const m=idx.get(b); if(st==null||!m) continue;
-      const pts=[...m.entries()].map(([ts,vals])=>{
+      let pts=[...m.entries()].map(([ts,vals])=>{
         let sum=0; for(const id of se.ids) sum += (vals.get(id)||0);
         return { t:elapsedMin(ts,st), qty:sum };
       }).sort((a,b2)=>a.t-b2.t);
-      if(pts.length) se.byBatch.set(b, pts);
+      if(!pts.length) continue;
+
+      // 仓库(split)模式下，每条序列就是一个仓库 → 可以套规则
+      if(isWh && se.ids.length===1){
+        const r=applyWarehouseRule(pts, se.ids[0], b);
+        pts=r.pts;
+        if(r.note && b===batches[0]) se.notes.push(r.note);   // 只提示目标批次的
+      }
+      // 安全网：修正后仍然下降 = 业务变了
+      const d=detectDrop(pts);
+      if(d && b===batches[0]) se.warns.push(`${hhmmOf(d.at, st)} 出现回落 ${d.from} → ${d.to}`);
+
+      se.byBatch.set(b, pts);
     }
   }
   return series;
@@ -414,12 +485,14 @@ function renderResults(results, T, batch){
           ? `已用本批 ${hhmmOf(res.anchor.t,start)} 实测 ${res.anchor.qty} 校准`
           : `本批还没数据，用历史平均`} · ${res.daysUsed}批训练</div>`;
     const warn = res.daysUsed<7 ? `<div class="sub" style="color:var(--orange)">⚠ 仅 ${res.daysUsed} 批历史，精度有限</div>` : "";
+    const note = (se.notes||[]).map(n=>`<div class="sub" style="color:var(--blue)">✎ ${esc(n)}</div>`).join("");
+    const bad  = (se.warns||[]).map(w=>`<div class="sub" style="color:var(--red)">⚠ ${esc(w)}（模型假定只增不减，此预测可能不准）</div>`).join("");
     box.innerHTML+=`
       <div class="rcard"><div class="accentbar" style="background:${se.color}"></div>
         <div class="lab"><span class="sw" style="background:${se.color}"></span>${esc(se.name)}</div>
         <div class="big num">${res.pred.toLocaleString()}</div>
         <div class="rng">± ${res.band}　( ${res.lo} – ${res.hi} )</div>
-        ${err}${warn}
+        ${err}${warn}${note}${bad}
       </div>`;
   });
   $("#chartSub").textContent=`${sd?sd.str+" 备货 · ":""}${hhmmOf(T,start)} · ${S.unit} · 纽约时间`;
