@@ -503,11 +503,10 @@ function renderChart(){
   const datasets=series.map(s=>({
     label:s.name, data:seriesValues(s.ids, ts),
     borderColor:s.color, backgroundColor:s.color,
-    tension: delta?0:.25,                 // 增量是柱状/折线，不做平滑
-    pointRadius: delta?0:2, pointHoverRadius:5, borderWidth:2,
+    tension:.25, pointRadius:2, pointHoverRadius:5, borderWidth:2,
     spanGaps:false,
   }));
-  const cfg={type: delta?"bar":"line", data:{labels,datasets}, options:{
+  const cfg={type:"line", data:{labels,datasets}, options:{
     responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
     plugins:{legend:{labels:{color:"#83838d",font:{family:"Space Grotesk"}}},
       tooltip:{backgroundColor:"#1b1b22",borderColor:"#2a2a32",borderWidth:1,titleColor:"#ece9e3",bodyColor:"#ece9e3"},
