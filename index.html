@@ -192,6 +192,9 @@
   .jobstat.running{border-color:var(--orange);color:var(--orange);background:rgba(236,139,60,.12)}
   .jobstat.done{border-color:var(--green-dim);color:var(--green);background:rgba(91,185,140,.1)}
   .jobstat.failed{border-color:var(--red);color:var(--red);background:rgba(201,106,94,.1)}
+  .shead .copy.dl{border-color:var(--green-dim);color:var(--green);text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px}
+  .shead .copy.dl:hover{background:var(--green);color:#0d1f16;border-color:var(--green)}
   .jobbar{height:3px;background:var(--line-soft)}
   .jobbar-fill{height:100%;width:0;background:var(--orange);transition:width .3s}
   #jobLog{max-height:280px;overflow-y:auto;font-size:12px;line-height:1.65}
@@ -280,7 +283,8 @@
     <div class="shead">
       <h3 id="jobTitle">任务</h3>
       <span class="jobstat" id="jobStat">—</span>
-      <button class="copy" id="jobClose" style="margin-left:auto">收起</button>
+      <a class="copy dl" id="jobPdf" style="margin-left:auto;display:none" target="_blank" rel="noopener">⬇︎ 下载 PDF</a>
+      <button class="copy" id="jobClose">收起</button>
     </div>
     <div class="jobbar"><div class="jobbar-fill" id="jobFill"></div></div>
     <pre id="jobLog"></pre>
@@ -940,6 +944,7 @@ function watchJob(id){
   $t("jobTitle").textContent = "任务 #" + id;
   $t("jobLog").innerHTML = "";
   $t("jobFill").style.width = "0";
+  $t("jobPdf").style.display = "none";
   setJobStat("queued");
   $t("jobPanel").scrollIntoView({behavior:"smooth", block:"nearest"});
 
@@ -959,6 +964,7 @@ function watchJob(id){
           if(job.error) appendLogs([{at:new Date(),level:"error",line:job.error}]);
           toast(job.status==="done" ? "任务完成 ✓" : "任务结束："+job.status);
         }
+        await showPdf(id);
       }
       const { data: logs } = await sb.from("job_logs")
         .select("id,at,level,line").eq("job_id",id).gt("id",lastLogId)
@@ -971,6 +977,22 @@ function watchJob(id){
   tick();
 }
 
+async function showPdf(jobId){
+  try{
+    const { data } = await sb.from("bol_pdfs")
+      .select("url,bol_count,page_count").eq("job_id", jobId)
+      .order("created_at",{ascending:false}).limit(1);
+    const a = $t("jobPdf");
+    if(data && data.length){
+      a.href = data[0].url;
+      a.textContent = `⬇︎ 下载 PDF（${data[0].bol_count} 单 / ${data[0].page_count} 页）`;
+      a.style.display = "inline-flex";
+    }else{
+      a.style.display = "none";
+    }
+  }catch(e){ /* 表可能还没建 */ }
+}
+
 $t("dispatchBtn").onclick = dispatchJob;
 $t("jobClose").onclick = ()=>{ $t("jobPanel").classList.remove("show"); };
 
@@ -981,7 +1003,23 @@ async function resumeJob(){
     const { data } = await sb.from("jobs")
       .select("id,status").in("status",["queued","running"])
       .order("id",{ascending:false}).limit(1);
-    if(data && data.length) watchJob(data[0].id);
+    if(data && data.length){ watchJob(data[0].id); return; }
+
+    // 没有在跑的任务：把今天最新那份 PDF 挂出来（关掉网页再打开也拿得到）
+    const { data: pdf } = await sb.from("bol_pdfs")
+      .select("url,bol_count,page_count,job_id")
+      .eq("ship_date", NY(new Date()))
+      .order("created_at",{ascending:false}).limit(1);
+    if(pdf && pdf.length){
+      $t("jobPanel").classList.add("show");
+      $t("jobTitle").textContent = "今天的 PDF（任务 #"+pdf[0].job_id+"）";
+      setJobStat("done");
+      $t("jobFill").style.width = "100%";
+      const a = $t("jobPdf");
+      a.href = pdf[0].url;
+      a.textContent = `⬇︎ 下载 PDF（${pdf[0].bol_count} 单 / ${pdf[0].page_count} 页）`;
+      a.style.display = "inline-flex";
+    }
   }catch(e){/* 表可能还没建，忽略 */}
 }
 
