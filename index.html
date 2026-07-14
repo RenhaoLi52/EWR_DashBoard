@@ -186,6 +186,19 @@
     font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:50}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  .jobstat{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    padding:3px 8px;border-radius:5px;border:1px solid var(--line);color:var(--muted);background:var(--raised)}
+  .jobstat.queued{border-color:var(--line);color:var(--muted)}
+  .jobstat.running{border-color:var(--orange);color:var(--orange);background:rgba(236,139,60,.12)}
+  .jobstat.done{border-color:var(--green-dim);color:var(--green);background:rgba(91,185,140,.1)}
+  .jobstat.failed{border-color:var(--red);color:var(--red);background:rgba(201,106,94,.1)}
+  .jobbar{height:3px;background:var(--line-soft)}
+  .jobbar-fill{height:100%;width:0;background:var(--orange);transition:width .3s}
+  #jobLog{max-height:280px;overflow-y:auto;font-size:12px;line-height:1.65}
+  #jobLog .ok{color:var(--green)}
+  #jobLog .warn{color:var(--orange)}
+  #jobLog .error{color:var(--red)}
+  #jobLog .t{color:var(--faint)}
   .rlist::-webkit-scrollbar,pre::-webkit-scrollbar{height:8px;width:8px}
   .rlist::-webkit-scrollbar-thumb,pre::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
 </style>
@@ -255,10 +268,22 @@
         <div class="stat"><span class="n" id="tPallets">0</span><span class="l">总 pallet</span></div>
       </div>
       <div class="actions">
-        <button class="btn primary" id="exportBtn" disabled>导出 PLAN</button>
+        <button class="btn primary" id="dispatchBtn" disabled>🚀 发布任务</button>
+        <button class="btn" id="exportBtn" disabled>导出 PLAN</button>
         <button class="btn ghost" id="clearBtn" disabled>清空</button>
       </div>
     </section>
+  </div>
+
+  <!-- job panel -->
+  <div class="sheet" id="jobPanel">
+    <div class="shead">
+      <h3 id="jobTitle">任务</h3>
+      <span class="jobstat" id="jobStat">—</span>
+      <button class="copy" id="jobClose" style="margin-left:auto">收起</button>
+    </div>
+    <div class="jobbar"><div class="jobbar-fill" id="jobFill"></div></div>
+    <pre id="jobLog"></pre>
   </div>
 
   <!-- export sheet -->
@@ -464,6 +489,7 @@ function renderPlan(){
   document.getElementById("totals").style.display = has?"flex":"none";
   document.getElementById("exportBtn").disabled = !has;
   document.getElementById("clearBtn").disabled = !has;
+  document.getElementById("dispatchBtn").disabled = !has;
   if(!has) document.getElementById("sheet").classList.remove("show");
 }
 
@@ -858,17 +884,136 @@ function showFallback(missing){
 
 initSupabaseTemplates();
 
+/* ============================================================
+   任务队列：发布 → worker 领走 → 日志实时回流
+   ============================================================ */
+const NY = d => new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York"}).format(d);
+let jobChan = null, jobPoll = null, curJobId = null;
+
+function setJobStat(st, extra){
+  const el = $t("jobStat");
+  el.className = "jobstat " + (st||"");
+  const map = {queued:"排队中", running:"执行中", done:"已完成", failed:"失败", canceled:"已取消"};
+  el.textContent = (map[st] || st || "—") + (extra ? " · " + extra : "");
+}
+function appendLogs(rows){
+  const box = $t("jobLog");
+  rows.forEach(r=>{
+    const t = new Date(r.at).toLocaleTimeString("en-GB",{hour12:false});
+    const div = document.createElement("div");
+    div.className = r.level || "info";
+    div.innerHTML = '<span class="t">'+t+'</span>  '+esc(r.line);
+    box.appendChild(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+async function dispatchJob(){
+  if(!sb){ toast("没连上 Supabase，无法发布任务"); return; }
+  const items = planToItems();
+  if(!items.length) return;
+  const missing = items.filter(i=>!(i.palletPerTruck>0)).map(i=>i.route);
+  if(missing.length && !confirm(`有 ${missing.length} 条线路每车 pallet 是 0，仍要发布？`)) return;
+
+  const trucks = items.reduce((s,i)=>s+i.trucks,0);
+  const day = NY(new Date());
+  if(!confirm(`发布任务：${items.length} 条线路 · ${trucks} 车\nship_date = ${day}\n\nworker 下一轮会真的开单。确认？`)) return;
+
+  $t("dispatchBtn").disabled = true;
+  try{
+    const { data, error } = await sb.from("jobs")
+      .insert({ kind:"create_bols", ship_date:day, plan:items,
+                status:"queued", total:trucks, created_by:"web" })
+      .select("id,status,total").single();
+    if(error) throw error;
+    toast(`任务 #${data.id} 已发布，等 worker 领取`);
+    watchJob(data.id);
+  }catch(e){
+    toast("发布失败："+(e.message||e));
+    $t("dispatchBtn").disabled = false;
+  }
+}
+
+function watchJob(id){
+  curJobId = id;
+  $t("jobPanel").classList.add("show");
+  $t("jobTitle").textContent = "任务 #" + id;
+  $t("jobLog").innerHTML = "";
+  $t("jobFill").style.width = "0";
+  setJobStat("queued");
+  $t("jobPanel").scrollIntoView({behavior:"smooth", block:"nearest"});
+
+  let lastLogId = 0;
+  const tick = async ()=>{
+    if(curJobId !== id) return;
+    try{
+      const { data: job } = await sb.from("jobs")
+        .select("status,progress,total,error").eq("id",id).single();
+      if(job){
+        const pct = job.total ? Math.round(job.progress*100/job.total) : 0;
+        $t("jobFill").style.width = pct + "%";
+        setJobStat(job.status, job.total ? `${job.progress}/${job.total} 车` : "");
+        if(["done","failed","canceled"].includes(job.status)){
+          clearInterval(jobPoll); jobPoll = null;
+          $t("dispatchBtn").disabled = plan.size===0;
+          if(job.error) appendLogs([{at:new Date(),level:"error",line:job.error}]);
+          toast(job.status==="done" ? "任务完成 ✓" : "任务结束："+job.status);
+        }
+      }
+      const { data: logs } = await sb.from("job_logs")
+        .select("id,at,level,line").eq("job_id",id).gt("id",lastLogId)
+        .order("id",{ascending:true});
+      if(logs && logs.length){ lastLogId = logs[logs.length-1].id; appendLogs(logs); }
+    }catch(e){ console.warn("轮询任务失败", e); }
+  };
+  clearInterval(jobPoll);
+  jobPoll = setInterval(tick, 2000);
+  tick();
+}
+
+$t("dispatchBtn").onclick = dispatchJob;
+$t("jobClose").onclick = ()=>{ $t("jobPanel").classList.remove("show"); };
+
+/* 进页面时，如果今天有还没跑完的任务，自动挂上去看 */
+async function resumeJob(){
+  if(!sb) return;
+  try{
+    const { data } = await sb.from("jobs")
+      .select("id,status").in("status",["queued","running"])
+      .order("id",{ascending:false}).limit(1);
+    if(data && data.length) watchJob(data[0].id);
+  }catch(e){/* 表可能还没建，忽略 */}
+}
+
+/* ---- 路线：优先读 Supabase 的 routes 表，读不到再退回 routes.json ---- */
+async function loadRoutesFromDB(){
+  if(!sb) return false;
+  try{
+    const { data, error } = await sb.from("routes")
+      .select("route,count").order("count",{ascending:false}).limit(5000);
+    if(error || !data || !data.length) return false;
+    initRoutes(data);
+    document.getElementById("originHint").textContent += " · 来自数据库";
+    return true;
+  }catch(e){ return false; }
+}
+
 function loadAll(){
-  Promise.allSettled(FILES.map(f =>
+  const files = FILES.slice();
+  Promise.allSettled(files.map(f =>
     fetch(f.name).then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return f.asText ? r.text() : r.json(); })
       .then(data=>{ f.ingest(data); return true; })
-  )).then(res=>{
+  )).then(async res=>{
     const missing = [];
-    res.forEach((r,i)=>{ if(r.status==="rejected") missing.push(FILES[i]); });
+    res.forEach((r,i)=>{ if(r.status==="rejected") missing.push(files[i]); });
+    // routes.json 拿不到？试试数据库
+    const idx = missing.findIndex(f=>f.name==="routes.json");
+    if(idx>=0 && await loadRoutesFromDB()) missing.splice(idx,1);
     if(missing.length) showFallback(missing);
   });
 }
 loadAll();
+resumeJob();
 </script>
 </body>
 </html>
