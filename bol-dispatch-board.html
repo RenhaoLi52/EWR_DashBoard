@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
   /* 配色令牌与导航栏在 shared.css 中统一定义 */
   *{box-sizing:border-box}
@@ -128,7 +129,7 @@
     <div class="brand">
       <div class="kick">BOL Board</div>
       <h1>BOL 调度板</h1>
-      <div class="sub">今日所有单据 · 单号 · 路线 · 当前状态</div>
+      <div class="sub">所有单据 · 起点 / 日期筛选 · 状态每 20 分钟自动同步</div>
     </div>
     <div class="date"><span id="genTime">把 bols_combined.json 拖进来开始</span></div>
   </header>
@@ -147,6 +148,10 @@
       <select id="fDate"></select>
     </div>
     <div class="field">
+      <label for="fOrigin">起点</label>
+      <select id="fOrigin"></select>
+    </div>
+    <div class="field">
       <label for="fStatus">状态</label>
       <select id="fStatus"></select>
     </div>
@@ -159,18 +164,28 @@
       <input type="search" id="fSearch" placeholder="如 UNITRANS00005104、SWF001…">
     </div>
     <div class="field">
-      <button class="btn" id="btnReload">重新载入 JSON</button>
+      <label>范围</label>
+      <select id="fDays">
+        <option value="3">近 3 天</option>
+        <option value="7" selected>近 7 天</option>
+        <option value="14">近 14 天</option>
+        <option value="30">近 30 天</option>
+        <option value="90">近 90 天</option>
+      </select>
+    </div>
+    <div class="field">
+      <button class="btn" id="btnReload">刷新</button>
     </div>
   </section>
 
   <!-- 载入区 -->
   <div id="loader">
     <div class="drop" id="drop">
-      <h2>载入今天的单据</h2>
-      <p>把 <code>bols_combined.json</code> 拖到这里，或点击选择文件</p>
-      <button class="btn primary" id="btnPick">选择 JSON 文件</button>
+      <h2 id="dropTitle">正在从数据库读取…</h2>
+      <p id="dropMsg">连接 Supabase 中</p>
+      <button class="btn primary" id="btnPick" hidden>改用 JSON 文件</button>
       <input type="file" id="filePick" accept=".json,application/json" hidden>
-      <div class="hint">也可用本地服务器打开，会自动读取同目录的 bols_combined.json</div>
+      <div class="hint">数据由本地 watch_bols.py 每几分钟同步一次；数据库不通时可拖入 JSON 应急</div>
     </div>
   </div>
 
@@ -203,6 +218,14 @@ fetch("nav.html")
   .then(html => { document.getElementById("nav-slot").innerHTML = html; });
 (function(){
   "use strict";
+
+  /* ===== Supabase（只读；写入由本地 worker 用 service_role 完成） ===== */
+  var SUPABASE_URL      = "https://euibahjwdfgtoqvchibb.supabase.co";
+  var SUPABASE_ANON_KEY = "sb_publishable_dQ1a562_DS1hN9i1G1O3jA_PlgXE54E";
+  var sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  var DAYS = 7;
+  var reloadTimer = null;
 
   var ALL = [];           // 全部单据（规范化后）
   var sortKey = "bol", sortDir = 1;
@@ -248,6 +271,7 @@ fetch("nav.html")
         shipDate: it.ship_date || "",
         nodes: nodes,
         routeStr: nodes.map(function(n){return n.code;}).join(" "),
+        origin: nodes.length ? nodes[0].code : "",
         dest: nodes.length ? nodes[nodes.length-1].code : ""
       };
     });
@@ -272,11 +296,13 @@ fetch("nav.html")
   // ---- 渲染 ----
   function currentFiltered(){
     var d = document.getElementById("fDate").value;
+    var og = document.getElementById("fOrigin").value;
     var st = document.getElementById("fStatus").value;
     var ca = document.getElementById("fCarrier").value;
     var q = document.getElementById("fSearch").value.trim().toUpperCase();
     return ALL.filter(function(r){
       if (d!=="__all" && r.shipDate!==d) return false;
+      if (og!=="__all" && r.origin!==og) return false;
       if (st!=="__all" && r.status!==st) return false;
       if (ca!=="__all" && r.carrier!==ca) return false;
       if (q){
@@ -354,8 +380,15 @@ fetch("nav.html")
     var statuses = uniqSorted(ALL.map(function(r){return r.status;}));
     var carriers = uniqSorted(ALL.map(function(r){return r.carrier;}));
 
+    var origins = uniqSorted(ALL.map(function(r){return r.origin;}));
+    var fOrigin=document.getElementById("fOrigin");
+    var prevOrigin = fOrigin.value;
+    fOrigin.innerHTML = '<option value="__all">全部起点</option>' +
+      origins.map(function(o){return '<option value="'+esc(o)+'">'+esc(o)+'</option>';}).join("");
+    if (prevOrigin && origins.indexOf(prevOrigin)>=0) fOrigin.value = prevOrigin;
+
     var fDate=document.getElementById("fDate");
-    var today = new Date().toISOString().slice(0,10);
+    var today = new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York"}).format(new Date());
     var defaultDate = dates.indexOf(today)>=0 ? today : (dates[0]||"__all");
     fDate.innerHTML = '<option value="__all">全部日期</option>' +
       dates.map(function(d){return '<option value="'+d+'">'+d+'</option>';}).join("");
@@ -402,7 +435,7 @@ fetch("nav.html")
   }
 
   // ---- 事件 ----
-  ["fDate","fStatus","fCarrier"].forEach(function(id){
+  ["fDate","fOrigin","fStatus","fCarrier"].forEach(function(id){
     document.getElementById(id).addEventListener("change",render);
   });
   document.getElementById("fSearch").addEventListener("input",render);
@@ -417,7 +450,7 @@ fetch("nav.html")
 
   var pick=document.getElementById("filePick");
   document.getElementById("btnPick").addEventListener("click",function(){pick.click();});
-  document.getElementById("btnReload").addEventListener("click",function(){pick.value="";pick.click();});
+  document.getElementById("btnReload").addEventListener("click", function(){ loadFromDB(); });
   pick.addEventListener("change",function(){ if(pick.files[0]) readFile(pick.files[0]); });
 
   var drop=document.getElementById("drop");
@@ -431,12 +464,71 @@ fetch("nav.html")
     var f=e.dataTransfer.files[0]; if(f) readFile(f);
   });
 
-  // 通过 http 服务器打开时，尝试自动读取同目录 json
-  if(location.protocol==="http:"||location.protocol==="https:"){
-    fetch("bols_combined.json").then(function(r){
-      if(r.ok) return r.json(); throw 0;
-    }).then(loadData).catch(function(){/* 安静失败，等用户手动载入 */});
+  // ================= 数据库 =================
+  function daysAgo(n){
+    return new Date(Date.now() - n*86400000).toISOString().slice(0,10);
   }
+  function setDrop(title, msg, allowFile){
+    document.getElementById("dropTitle").textContent = title;
+    document.getElementById("dropMsg").textContent = msg;
+    document.getElementById("btnPick").hidden = !allowFile;
+  }
+
+  function loadFromDB(){
+    if(!sb){ setDrop("数据库未连接", "supabase-js 没加载成功，可先拖入 JSON", true); return; }
+    setDrop("正在从数据库读取…", "近 "+DAYS+" 天的单据", false);
+
+    sb.from("bols")
+      .select("raw,updated_at")
+      .gte("ship_date", daysAgo(DAYS))
+      .order("bol_number", { ascending: true })
+      .limit(5000)
+      .then(function(res){
+        if(res.error) throw res.error;
+        var rows = res.data || [];
+        if(!rows.length){
+          setDrop("近 "+DAYS+" 天没有单据", "换个范围，或确认 watch_bols.py 在跑", true);
+          return;
+        }
+        var last = rows.reduce(function(m,r){
+          return (!m || r.updated_at > m) ? r.updated_at : m;
+        }, null);
+
+        loadData({ items: rows.map(function(r){ return r.raw; }) });
+
+        var ago = last ? Math.round((Date.now() - new Date(last)) / 60000) : null;
+        document.getElementById("genTime").textContent =
+          "数据库 · " + rows.length + " 单 · 最后同步 " +
+          (ago === null ? "未知" : (ago < 1 ? "刚刚" : ago + " 分钟前"));
+      })
+      .catch(function(e){
+        console.error(e);
+        setDrop("数据库读取失败", (e.message || e) + " —— 可以拖入 JSON 应急", true);
+        document.getElementById("loader").hidden = false;
+      });
+  }
+
+  function scheduleReload(){                 // 防抖，避免一批写入触发几十次
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(loadFromDB, 1500);
+  }
+
+  document.getElementById("fDays").addEventListener("change", function(){
+    DAYS = Number(this.value);
+    document.getElementById("loader").hidden = false;
+    loadFromDB();
+  });
+
+  // Realtime：worker 一写库，板子自己刷新（需在 Supabase 开启该表的 Replication）
+  if(sb){
+    sb.channel("bols-live")
+      .on("postgres_changes", { event:"*", schema:"public", table:"bols" }, scheduleReload)
+      .subscribe();
+  }
+  // 兜底轮询：Realtime 没开也能每 2 分钟自己刷
+  setInterval(loadFromDB, 120000);
+
+  loadFromDB();
 })();
 </script>
 </body>
