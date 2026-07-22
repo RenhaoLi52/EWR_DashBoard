@@ -1044,9 +1044,13 @@ function loadAll(){
   )).then(async res=>{
     const missing = [];
     res.forEach((r,i)=>{ if(r.status==="rejected") missing.push(files[i]); });
-    // routes.json 拿不到？试试数据库
+
+    // 路线以数据库为准：不管 routes.json 读没读到，都用 DB 覆盖一遍
+    const okFromDB = await loadRoutesFromDB();
+
     const idx = missing.findIndex(f=>f.name==="routes.json");
-    if(idx>=0 && await loadRoutesFromDB()) missing.splice(idx,1);
+    if(idx>=0 && okFromDB) missing.splice(idx,1);   // json 没读到但 DB 读到了，就不算缺文件
+
     if(missing.length) showFallback(missing);
   });
 }
